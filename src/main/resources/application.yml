@@ -1,0 +1,28 @@
+server:
+  port: ${SERVER_PORT:8000}
+
+spring:
+  application:
+    name: backend
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:app}
+    username: ${POSTGRES_USER:app}
+    password: ${POSTGRES_PASSWORD:app}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+inference:
+  api-url: ${INFERENCE_API_URL:}
+  timeout-seconds: ${INFERENCE_TIMEOUT_SECONDS:8}
