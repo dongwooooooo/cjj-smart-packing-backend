@@ -39,6 +39,11 @@ docker compose up -d db
 src/main/java/com/awesome/backend/
   common/error/     공통 에러 포맷 (02-api-spec §0) — ErrorCode, ApiException, GlobalExceptionHandler
   common/config/    Swagger 그룹 (service = /api/v1/**, admin = /api/v1/admin/**)
+  inbound/          P1 입고 도메인 (스캔·측정·수량입고)
+  outbound/         P2 출고 포장 도메인 (토트 스캔·포장완료)
+  orders/           P3 출고지시·주문 도메인
+    packing/        카토나이제이션 — PackingEngine(배치 판정), Cartonizer(편성), BlockFactory
+  dashboard/        관리자 대시보드 (2차 MVP)
 src/main/resources/db/migration/
   V1__schema.sql    ERD v0.3 전체 16 테이블
   V2__seed.sql      Phase 1 seed — category, region·line 3개, box_type A~E호, tote, 시연 상품 무게 매핑 (D-10)
