@@ -19,6 +19,13 @@ class BlockFactoryTest {
         assertThat(block.widthMm()).isEqualTo(250);
         assertThat(block.lengthMm()).isEqualTo(160);
         assertThat(block.heightMm()).isEqualTo(130);
+        // 파손주의 여부는 완충재 권유 표시의 원천 — 버리면 안 된다
+        assertThat(items.get(0).fragile()).isTrue();
+    }
+
+    @Test
+    void 수량_0이면_낱개를_만들지_않는다() {
+        assertThat(factory.toItems("8803", 10, 10, 10, false, false, 0)).isEmpty();
     }
 
     @Test

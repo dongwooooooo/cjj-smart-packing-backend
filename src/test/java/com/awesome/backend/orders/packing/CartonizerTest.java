@@ -18,7 +18,7 @@ class CartonizerTest {
     private final Cartonizer cartonizer = new Cartonizer(new PackingEngine(3.0));
 
     private static PackItem item(String gtin, double w, double l, double h) {
-        return new PackItem(gtin, Block.ofCm(w, l, h), false);
+        return new PackItem(gtin, Block.ofCm(w, l, h), false, false);
     }
 
     @Test
@@ -48,7 +48,7 @@ class CartonizerTest {
     @Test
     void 적층불가_상품은_일반_상품과_배송단위를_분리한다() {
         // 전부 한 박스에 들어가는 크기지만 적층불가라 분리돼야 한다
-        PackItem irregular = new PackItem("8803", Block.ofCm(10, 10, 5), true);
+        PackItem irregular = new PackItem("8803", Block.ofCm(10, 10, 5), false, true);
         PackItem normal = item("8804", 10, 10, 5);
 
         List<ShipmentPlan> plans = cartonizer.cartonize(List.of(irregular, normal), CATALOG);
@@ -58,8 +58,8 @@ class CartonizerTest {
 
     @Test
     void 같은_적층불가_상품끼리는_한_배송단위를_허용한다() {
-        PackItem a = new PackItem("8803", Block.ofCm(10, 10, 5), true);
-        PackItem b = new PackItem("8803", Block.ofCm(10, 10, 5), true);
+        PackItem a = new PackItem("8803", Block.ofCm(10, 10, 5), false, true);
+        PackItem b = new PackItem("8803", Block.ofCm(10, 10, 5), false, true);
 
         List<ShipmentPlan> plans = cartonizer.cartonize(List.of(a, b), CATALOG);
 
@@ -79,6 +79,33 @@ class CartonizerTest {
 
         assertThat(plans).hasSize(2);
         assertThat(plans).allSatisfy(plan -> assertThat(plan.boxId()).isEqualTo(4));
+        // 이동 과정에서 낱개가 소실·중복되지 않아야 한다
+        assertThat(plans.stream().mapToInt(p -> p.items().size()).sum()).isEqualTo(3);
+    }
+
+    @Test
+    void 파손주의_상품이_있는_배송단위만_완충재를_권유한다() {
+        PackItem fragile = new PackItem("8809", Block.ofCm(10, 10, 5), true, false);
+        PackItem normal = item("8810", 40.5, 30.5, 28); // 어느 축에도 5cm 틈이 안 남아 분리됨
+
+        List<ShipmentPlan> plans = cartonizer.cartonize(List.of(fragile, normal), CATALOG);
+
+        assertThat(plans).hasSize(2);
+        assertThat(plans).anySatisfy(p -> {
+            assertThat(p.items().get(0).gtin()).isEqualTo("8809");
+            assertThat(p.fillerRecommended()).isTrue();
+        });
+        assertThat(plans).anySatisfy(p -> {
+            assertThat(p.items().get(0).gtin()).isEqualTo("8810");
+            assertThat(p.fillerRecommended()).isFalse();
+        });
+    }
+
+    @Test
+    void 박스_카탈로그가_비어_있으면_설정_오류다() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> cartonizer.cartonize(List.of(item("8801", 7, 7, 23)), List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

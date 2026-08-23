@@ -18,7 +18,7 @@ public class BlockFactory {
         // 완충재는 상품을 감싸므로 파손주의 블록의 각 변에 양쪽 두께를 더한다
         double pad = fragile ? fillerThicknessCm * 2 : 0;
         Block block = Block.ofCm(widthCm + pad, lengthCm + pad, heightCm + pad);
-        PackItem item = new PackItem(gtin, block, nonStackable);
+        PackItem item = new PackItem(gtin, block, fragile, nonStackable);
         return java.util.Collections.nCopies(qty, item);
     }
 }

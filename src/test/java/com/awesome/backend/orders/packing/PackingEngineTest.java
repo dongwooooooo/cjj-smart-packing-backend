@@ -47,6 +47,18 @@ class PackingEngineTest {
     }
 
     @Test
+    void 빈_블록_목록은_수용한다() {
+        assertThat(engine.canPack(List.of(), BoxSpec.ofCm(27, 18, 15))).isTrue();
+    }
+
+    @Test
+    void 마진이_내치수_이상인_박스는_빈_목록만_수용한다() {
+        BoxSpec tiny = BoxSpec.ofCm(3, 3, 3); // 유효 내치수 0
+        assertThat(engine.canPack(List.of(Block.ofCm(1, 1, 1)), tiny)).isFalse();
+        assertThat(engine.canPack(List.of(), tiny)).isTrue();
+    }
+
+    @Test
     void 부피_합은_남아도_배치가_불가능한_블록들은_거부한다() {
         // 유효 30×30×30 (부피 27,000), 블록 25×25×20 두 개 (부피 합 25,000)
         // 쌓으면 높이 40, 나란히 놓으면 폭 50 — 어떤 배치로도 불가

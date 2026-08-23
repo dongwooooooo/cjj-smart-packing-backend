@@ -17,6 +17,10 @@ public class Cartonizer {
     }
 
     public List<ShipmentPlan> cartonize(List<PackItem> items, List<CatalogBox> catalog) {
+        if (catalog.isEmpty()) {
+            // 설정 오류 — 비즈니스 거부(OVERSIZED_ITEM)와 섞이면 안 된다
+            throw new IllegalArgumentException("box catalog is empty");
+        }
         List<CatalogBox> ascending = catalog.stream()
                 .sorted(Comparator.comparingLong(CatalogBox::innerVolumeMm3))
                 .toList();
@@ -48,14 +52,14 @@ public class Cartonizer {
         // 통째 시도: 전체가 박스 1개에 들어가면 그 최소 박스가 곧 최적
         CatalogBox whole = minBox(group, ascending);
         if (whole != null) {
-            return List.of(new ShipmentPlan(whole.id(), List.copyOf(group)));
+            return List.of(ShipmentPlan.of(whole.id(), List.copyOf(group)));
         }
 
         List<List<PackItem>> units = firstFitDecreasing(group, ascending);
         units = improveByMoves(units, ascending);
         List<ShipmentPlan> plans = new ArrayList<>();
         for (List<PackItem> unit : units) {
-            plans.add(new ShipmentPlan(minBox(unit, ascending).id(), unit));
+            plans.add(ShipmentPlan.of(minBox(unit, ascending).id(), unit));
         }
         return plans;
     }
