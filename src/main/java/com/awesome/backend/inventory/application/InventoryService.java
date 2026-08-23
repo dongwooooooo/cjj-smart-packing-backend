@@ -1,0 +1,79 @@
+package com.awesome.backend.inventory.application;
+
+import com.awesome.backend.common.error.ApiException;
+import com.awesome.backend.common.error.ErrorCode;
+import com.awesome.backend.inbound.domain.Product;
+import com.awesome.backend.inbound.domain.ProductRepository;
+import com.awesome.backend.inventory.domain.InventoryTx;
+import com.awesome.backend.inventory.domain.InventoryTxRepository;
+import com.awesome.backend.outbound.domain.ShipmentItemRepository;
+import java.util.Map;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * 재고 이동·조회 구현. 장부 기록과 캐시 갱신을 한 트랜잭션으로 묶는 단일 창구.
+ */
+@Service
+@Transactional
+public class InventoryService implements AvailableStockQuery, StockMovementRecorder {
+
+    private final ProductRepository productRepository;
+    private final InventoryTxRepository inventoryTxRepository;
+    private final ShipmentItemRepository shipmentItemRepository;
+
+    public InventoryService(ProductRepository productRepository,
+                            InventoryTxRepository inventoryTxRepository,
+                            ShipmentItemRepository shipmentItemRepository) {
+        this.productRepository = productRepository;
+        this.inventoryTxRepository = inventoryTxRepository;
+        this.shipmentItemRepository = shipmentItemRepository;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public int onHandQty(String gtin) {
+        return product(gtin).stockQty();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public int availableQty(String gtin) {
+        Product product = product(gtin);
+        return product.stockQty() - shipmentItemRepository.allocatedQty(product.id());
+    }
+
+    @Override
+    public void recordInbound(String gtin, int qty) {
+        Product product = product(gtin);
+        product.changeStockQty(product.stockQty() + qty);
+        inventoryTxRepository.save(
+                new InventoryTx(product.id(), InventoryTx.TxType.INBOUND, qty, "STOCK_IN", null));
+    }
+
+    @Override
+    public void recordOutboundPacked(String gtin, int qty, long shipmentId) {
+        Product product = product(gtin);
+        if (product.stockQty() < qty) {
+            throw new ApiException(ErrorCode.OUT_OF_STOCK, "재고가 부족합니다.",
+                    Map.of("gtin", gtin, "requested", qty, "available", product.stockQty()));
+        }
+        product.changeStockQty(product.stockQty() - qty);
+        inventoryTxRepository.save(
+                new InventoryTx(product.id(), InventoryTx.TxType.OUTBOUND_PACKED, -qty, "SHIPMENT", shipmentId));
+    }
+
+    @Override
+    public void adjust(String gtin, int delta) {
+        Product product = product(gtin);
+        product.changeStockQty(product.stockQty() + delta);
+        inventoryTxRepository.save(
+                new InventoryTx(product.id(), InventoryTx.TxType.ADJUST, delta, null, null));
+    }
+
+    private Product product(String gtin) {
+        return productRepository.findByGtin(gtin)
+                .orElseThrow(() -> new ApiException(ErrorCode.PRODUCT_NOT_FOUND,
+                        "상품을 찾을 수 없습니다.", Map.of("gtin", gtin)));
+    }
+}
