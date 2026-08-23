@@ -1,9 +1,22 @@
 package com.awesome.backend.inbound.domain;
 
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByGtin(String gtin);
+
+    /**
+     * 재고 증감용 조회 — 행 잠금(SELECT FOR UPDATE).
+     * 두 트랜잭션이 같은 상품의 stock_qty를 동시에 read-modify-write 하면
+     * 나중 커밋이 먼저 커밋을 덮어쓰므로(lost update), 쓰기 경로는 반드시 이걸 쓴다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Product p where p.gtin = :gtin")
+    Optional<Product> findByGtinForUpdate(@Param("gtin") String gtin);
 }

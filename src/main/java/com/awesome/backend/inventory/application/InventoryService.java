@@ -45,7 +45,7 @@ public class InventoryService implements AvailableStockQuery, StockMovementRecor
 
     @Override
     public void recordInbound(String gtin, int qty) {
-        Product product = product(gtin);
+        Product product = productForUpdate(gtin);
         product.changeStockQty(product.stockQty() + qty);
         inventoryTxRepository.save(
                 new InventoryTx(product.id(), InventoryTx.TxType.INBOUND, qty, "STOCK_IN", null));
@@ -53,7 +53,7 @@ public class InventoryService implements AvailableStockQuery, StockMovementRecor
 
     @Override
     public void recordOutboundPacked(String gtin, int qty, long shipmentId) {
-        Product product = product(gtin);
+        Product product = productForUpdate(gtin);
         if (product.stockQty() < qty) {
             throw new ApiException(ErrorCode.OUT_OF_STOCK, "재고가 부족합니다.",
                     Map.of("gtin", gtin, "requested", qty, "available", product.stockQty()));
@@ -65,7 +65,7 @@ public class InventoryService implements AvailableStockQuery, StockMovementRecor
 
     @Override
     public void adjust(String gtin, int delta) {
-        Product product = product(gtin);
+        Product product = productForUpdate(gtin);
         product.changeStockQty(product.stockQty() + delta);
         inventoryTxRepository.save(
                 new InventoryTx(product.id(), InventoryTx.TxType.ADJUST, delta, null, null));
@@ -73,7 +73,17 @@ public class InventoryService implements AvailableStockQuery, StockMovementRecor
 
     private Product product(String gtin) {
         return productRepository.findByGtin(gtin)
-                .orElseThrow(() -> new ApiException(ErrorCode.PRODUCT_NOT_FOUND,
-                        "상품을 찾을 수 없습니다.", Map.of("gtin", gtin)));
+                .orElseThrow(() -> notFound(gtin));
+    }
+
+    /** 쓰기 경로 전용 — 행 잠금으로 동시 증감의 lost update를 막는다. */
+    private Product productForUpdate(String gtin) {
+        return productRepository.findByGtinForUpdate(gtin)
+                .orElseThrow(() -> notFound(gtin));
+    }
+
+    private ApiException notFound(String gtin) {
+        return new ApiException(ErrorCode.PRODUCT_NOT_FOUND,
+                "상품을 찾을 수 없습니다.", Map.of("gtin", gtin));
     }
 }
