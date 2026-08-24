@@ -1,4 +1,4 @@
-package com.awesome.backend.inbound.measurement;
+package com.awesome.backend.inbound.entity;
 
 /**
  * 측정 세션 상태 (docs/03-erd.md §3).

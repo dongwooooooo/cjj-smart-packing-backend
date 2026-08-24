@@ -1,4 +1,4 @@
-package com.awesome.backend.inbound.scan.dto;
+package com.awesome.backend.inbound.controller;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

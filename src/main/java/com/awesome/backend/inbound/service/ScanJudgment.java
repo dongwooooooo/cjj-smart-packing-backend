@@ -1,4 +1,4 @@
-package com.awesome.backend.inbound.scan;
+package com.awesome.backend.inbound.service;
 
 /**
  * 바코드 스캔 3분기 판정 (docs/02-api-spec.md 1-1).

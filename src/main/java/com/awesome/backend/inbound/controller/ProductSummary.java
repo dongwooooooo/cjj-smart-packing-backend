@@ -1,4 +1,4 @@
-package com.awesome.backend.inbound.scan.dto;
+package com.awesome.backend.inbound.controller;
 
 import com.awesome.backend.inbound.entity.Category;
 import com.awesome.backend.inbound.entity.Product;

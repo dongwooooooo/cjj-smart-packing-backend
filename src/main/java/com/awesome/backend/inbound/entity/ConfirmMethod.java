@@ -1,4 +1,4 @@
-package com.awesome.backend.inbound.measurement;
+package com.awesome.backend.inbound.entity;
 
 /** 확정 방식 (docs/02-api-spec.md 1-4 의 method). */
 public enum ConfirmMethod {
