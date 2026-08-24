@@ -37,6 +37,8 @@ P3 담당. 계약 정본은 docs 저장소이며, 여기서 확정된 계약 변
 [결과 요약 응답]
 ```
 
+**패키지 구조 [확정]**: 도메인(inbound/outbound/orders/inventory) 분할 유지, 도메인 내부는 controller/service/repository/entity 4계층. 타 도메인 접근은 그 도메인의 service·repository를 직접 호출한다 — 단 쓰기 경로 규칙은 유지: 재고 증감·조회는 inventory의 InventoryService 창구로만, 상품 쓰기는 P1 전용, 배송단위·토트 생성은 U3의 outbound 서비스로.
+
 ## 2. A1 — 출고지시 접수 [확정]
 
 ```json

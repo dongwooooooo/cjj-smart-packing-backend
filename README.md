@@ -43,7 +43,19 @@ src/main/java/com/awesome/backend/
   outbound/         P2 출고 포장 도메인 (토트 스캔·포장완료)
   orders/           P3 출고지시·주문 도메인
     packing/        카토나이제이션 — PackingEngine(배치 판정), Cartonizer(편성), BlockFactory
+  inventory/        재고 도메인 (증감·조회 — InventoryService 창구)
   dashboard/        관리자 대시보드 (2차 MVP)
+
+각 도메인 내부는 controller/service/repository/entity 4계층으로 나뉜다 (orders/packing 같은 알고리즘 모듈은 예외). 타 도메인 접근은 그 도메인의 service·repository를 직접 호출한다.
+
+엔티티 배치 — 테이블 소유(docs/05 §1)를 그대로 따른다:
+
+| 도메인 | 엔티티 (V1 테이블) | 비고 |
+| --- | --- | --- |
+| inbound (P1) | Product · 추후 KoreanNetMaster, Category, CategoryAttributeMap, MeasurementSession, MeasurementImage | Product는 P3가 읽기 컬럼+재고 캐시만 매핑한 축소판 — P1이 확장·인수 |
+| outbound (P2) | Shipment, ShipmentItem, Tote, ToteAssignment, BoxType | 생성은 P3 import가 하지만 소유·확장은 P2 |
+| orders (P3) | Order(orders), OrderItem, Region, Line | |
+| inventory (P3) | InventoryTx | 재고 증감·조회는 InventoryService 창구로만 |
 src/main/resources/db/migration/
   V1__schema.sql    ERD v0.3 전체 16 테이블
   V2__seed.sql      Phase 1 seed — category, region·line 3개, box_type A~E호, tote, 시연 상품 무게 매핑 (D-10)
