@@ -1,6 +1,6 @@
-package com.awesome.backend.outbound.application;
+package com.awesome.backend.outbound.controller;
 
-import com.awesome.backend.outbound.domain.BoxType;
+import com.awesome.backend.outbound.entity.BoxType;
 import java.math.BigDecimal;
 import java.util.List;
 

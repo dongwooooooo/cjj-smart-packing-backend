@@ -1,8 +1,8 @@
-package com.awesome.backend.outbound.api;
+package com.awesome.backend.outbound.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.awesome.backend.outbound.application.BoxTypeResponse;
+import com.awesome.backend.outbound.controller.BoxTypeResponse;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;

@@ -1,7 +1,6 @@
-package com.awesome.backend.outbound.api;
+package com.awesome.backend.outbound.controller;
 
-import com.awesome.backend.outbound.application.BoxTypeResponse;
-import com.awesome.backend.outbound.application.BoxTypeService;
+import com.awesome.backend.outbound.service.BoxTypeService;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

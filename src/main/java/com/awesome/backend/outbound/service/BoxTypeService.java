@@ -1,6 +1,7 @@
-package com.awesome.backend.outbound.application;
+package com.awesome.backend.outbound.service;
 
-import com.awesome.backend.outbound.domain.BoxTypeRepository;
+import com.awesome.backend.outbound.controller.BoxTypeResponse;
+import com.awesome.backend.outbound.repository.BoxTypeRepository;
 import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
