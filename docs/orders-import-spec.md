@@ -81,6 +81,7 @@ POST /api/v1/admin/orders/import
 | 수량 결함 | qty ≤ 0 |
 | 빈 주문 | orders 또는 items가 빈 배열 |
 | 미등록 바코드 | GTIN이 상품 마스터에 없음 — 시연 가정 밖 입력이므로 요청 오류 취급. **상용 API(Shopify 등)는 건별 거부가 표준이나, 시연 데이터를 통제하므로 의도적으로 전체 거부** |
+| 치수 미확정 상품 | dim_status가 CONFIRMED가 아닌 상품 포함 — 편성이 치수 없이 불가. 입고(측정 확정)가 선행돼야 한다는 §3 전제의 방어. detail: gtin |
 
 ### 2층 — 주문별 거부 (rejected 노출, 저장 안 함)
 
