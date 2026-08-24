@@ -11,6 +11,8 @@ import com.awesome.backend.inbound.entity.MeasurementStatus;
 import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.MeasurementSessionRepository;
 import com.awesome.backend.inbound.repository.ProductRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,6 +55,7 @@ class MeasurementControllerIT {
     @Autowired WebApplicationContext context;
     @Autowired ProductRepository productRepository;
     @Autowired MeasurementSessionRepository sessionRepository;
+    @PersistenceContext EntityManager em;
 
     private MockMvc mvc;
 
@@ -108,7 +111,7 @@ class MeasurementControllerIT {
 
     @Test
     void 저장된_치수는_축_규약을_지킨다() throws Exception {
-        // D-15: 높이는 그대로, 나머지 두 변은 긴 쪽이 widthCm — 불변식 widthCm >= lengthCm
+        // D-18: 높이는 그대로, 나머지 두 변은 긴 쪽이 widthCm — 불변식 widthCm >= lengthCm
         Long productId = juiceId();
         mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content(body(productId)))
                 .andExpect(status().isOk());
@@ -184,12 +187,16 @@ class MeasurementControllerIT {
 
     @Test
     void 무게가_없는_상품도_촬영은_된다() throws Exception {
-        // 수기 등록 상품(1-2)은 사전 등록 무게가 없다. 저울 미수신은 실패가 아니라
-        // weightKg 만 null 이고 나머지 흐름은 그대로다 (02 §1-3)
-        Product manual = productRepository.save(
-                Product.manual("8809999999999", "무게 없는 상품", "C1010", Product.PLACEHOLDER_IMAGE_URL));
+        // 저울 미수신은 실패가 아니다 — weightKg 만 null 이고 나머지 흐름은 그대로다 (02 §1-3).
+        // seed 상품은 전부 무게가 있어(D-17) 여기서만 비운다. product 쓰기 API 를 거치지
+        // 않는 이유는, 무게를 지우는 정상 경로가 명세에 없기 때문이다.
+        Long productId = juiceId();
+        em.createQuery("update Product p set p.weightKg = null where p.id = :id")
+                .setParameter("id", productId)
+                .executeUpdate();
+        em.clear();
 
-        mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content(body(manual.id())))
+        mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content(body(productId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("INFERRED"))
                 .andExpect(jsonPath("$.weightKg").value(nullValue()));

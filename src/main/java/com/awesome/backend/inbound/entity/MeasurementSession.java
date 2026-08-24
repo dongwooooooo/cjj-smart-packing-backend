@@ -49,7 +49,7 @@ public class MeasurementSession {
     @Column(name = "status", length = 15, nullable = false)
     private MeasurementStatus status;
 
-    /** 추론 치수. 축 규약(D-15)에 맞춰 가로·세로를 정렬한 뒤 저장한다 (02 §1-3). */
+    /** 추론 치수. 축 규약(D-18)에 맞춰 가로·세로를 정렬한 뒤 저장한다 (02 §1-3). */
     @Column(name = "inferred_width_cm", precision = 5, scale = 1)
     private BigDecimal inferredWidthCm;
 
@@ -79,7 +79,7 @@ public class MeasurementSession {
     @Column(name = "confirm_method", length = 10)
     private ConfirmMethod confirmMethod;
 
-    /** 확정값. 축 규약(D-15)에 맞춰 정렬된 상태로 저장된다. */
+    /** 확정값. 축 규약(D-18)에 맞춰 정렬된 상태로 저장된다. */
     @Column(name = "confirmed_width_cm", precision = 6, scale = 1)
     private BigDecimal confirmedWidthCm;
 
@@ -141,7 +141,7 @@ public class MeasurementSession {
     }
 
     /**
-     * 확정 처리 (1-4). 가로·세로는 축 규약(D-15)에 맞춰 정렬해 기록한다.
+     * 확정 처리 (1-4). 가로·세로는 축 규약(D-18)에 맞춰 정렬해 기록한다.
      * 상태 검증(게이트·중복 확정)은 서비스에서 수행한다.
      */
     public void confirm(ConfirmMethod method, BigDecimal widthCm, BigDecimal lengthCm,

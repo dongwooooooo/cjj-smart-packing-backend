@@ -74,7 +74,7 @@ public class MeasurementService {
             return MeasurementResponse.failed(session, result.failReason());
         }
 
-        // 축 규약(D-15): 높이는 그대로 두고 가로·세로만 긴 쪽이 width 가 되도록 정렬한다.
+        // 축 규약(D-18): 높이는 그대로 두고 가로·세로만 긴 쪽이 width 가 되도록 정렬한다.
         // 모델 출력이 규약을 벗어나도 저장 전 여기서 맞춘다 (docs/05 §3 추론 응답 계약).
         boolean swap = result.widthCm().compareTo(result.lengthCm()) < 0;
         BigDecimal widthCm = swap ? result.lengthCm() : result.widthCm();
