@@ -43,7 +43,10 @@ src/main/java/com/awesome/backend/
   outbound/         P2 출고 포장 도메인 (토트 스캔·포장완료)
   orders/           P3 출고지시·주문 도메인
     packing/        카토나이제이션 — PackingEngine(배치 판정), Cartonizer(편성), BlockFactory
+  inventory/        재고 도메인 (증감·조회 — InventoryService 창구)
   dashboard/        관리자 대시보드 (2차 MVP)
+
+각 도메인 내부는 controller/service/repository/entity 4계층으로 나뉜다 (orders/packing 같은 알고리즘 모듈은 예외). 타 도메인 접근은 그 도메인의 service·repository를 직접 호출한다.
 src/main/resources/db/migration/
   V1__schema.sql    ERD v0.3 전체 16 테이블
   V2__seed.sql      Phase 1 seed — category, region·line 3개, box_type A~E호, tote, 시연 상품 무게 매핑 (D-10)

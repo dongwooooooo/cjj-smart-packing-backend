@@ -37,7 +37,7 @@ P3 담당. 계약 정본은 docs 저장소이며, 여기서 확정된 계약 변
 [결과 요약 응답]
 ```
 
-**도메인 간 접근 규칙 [확정]**: orders(P3)는 타 도메인의 엔티티·리포지토리를 직접 쓰지 않는다. P3가 **소비**하는 계약(상품 조회 ProductCatalog, 배송단위 등록 ShipmentRegistrar — U3 신설)은 orders/application에 정의하고 제공 도메인(P1·P2)이 구현한다. P3가 **제공**하는 계약(AvailableStockQuery·StockMovementRecorder)은 P3 소유인 inventory/application에 둔다. 도메인 소유자는 인터페이스 계약만 지키면 내부를 자유롭게 바꾼다.
+**패키지 구조 [확정]**: 도메인(inbound/outbound/orders/inventory) 분할 유지, 도메인 내부는 controller/service/repository/entity 4계층. 타 도메인 접근은 그 도메인의 service·repository를 직접 호출한다 — 단 쓰기 경로 규칙은 유지: 재고 증감·조회는 inventory의 InventoryService 창구로만, 상품 쓰기는 P1 전용, 배송단위·토트 생성은 U3의 outbound 서비스로.
 
 ## 2. A1 — 출고지시 접수 [확정]
 
