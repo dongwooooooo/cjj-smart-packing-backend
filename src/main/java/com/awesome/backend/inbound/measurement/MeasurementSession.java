@@ -1,6 +1,6 @@
 package com.awesome.backend.inbound.measurement;
 
-import com.awesome.backend.domain.product.Product;
+import com.awesome.backend.inbound.entity.Product;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

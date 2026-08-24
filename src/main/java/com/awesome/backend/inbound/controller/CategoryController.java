@@ -1,6 +1,6 @@
-package com.awesome.backend.domain.product;
+package com.awesome.backend.inbound.controller;
 
-import com.awesome.backend.domain.product.dto.CategoryResponse;
+import com.awesome.backend.inbound.repository.CategoryRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;

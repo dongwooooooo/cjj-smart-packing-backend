@@ -1,6 +1,6 @@
-package com.awesome.backend.domain.product.dto;
+package com.awesome.backend.inbound.controller;
 
-import com.awesome.backend.domain.product.Category;
+import com.awesome.backend.inbound.entity.Category;
 
 /**
  * 분류 목록 응답 (docs/02-api-spec.md 1-7).

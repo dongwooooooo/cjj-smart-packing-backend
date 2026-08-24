@@ -1,5 +1,7 @@
-package com.awesome.backend.domain.product;
+package com.awesome.backend.inbound.repository;
 
+import com.awesome.backend.inbound.entity.Category;
+import com.awesome.backend.inbound.entity.CategoryLevel;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 

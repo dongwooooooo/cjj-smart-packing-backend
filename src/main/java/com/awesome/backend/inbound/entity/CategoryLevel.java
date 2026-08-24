@@ -1,4 +1,4 @@
-package com.awesome.backend.domain.product;
+package com.awesome.backend.inbound.entity;
 
 /** 코리안넷 표준 분류의 계층 (docs/03-erd.md §2). */
 public enum CategoryLevel {

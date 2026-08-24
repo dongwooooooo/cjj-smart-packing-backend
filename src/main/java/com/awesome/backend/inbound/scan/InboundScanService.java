@@ -2,13 +2,13 @@ package com.awesome.backend.inbound.scan;
 
 import com.awesome.backend.common.error.ApiException;
 import com.awesome.backend.common.error.ErrorCode;
-import com.awesome.backend.domain.product.Category;
-import com.awesome.backend.domain.product.CategoryLevel;
-import com.awesome.backend.domain.product.CategoryRepository;
-import com.awesome.backend.domain.product.KoreanNetMaster;
-import com.awesome.backend.domain.product.KoreanNetMasterRepository;
-import com.awesome.backend.domain.product.Product;
-import com.awesome.backend.domain.product.ProductRepository;
+import com.awesome.backend.inbound.entity.Category;
+import com.awesome.backend.inbound.entity.CategoryLevel;
+import com.awesome.backend.inbound.entity.KoreanNetMaster;
+import com.awesome.backend.inbound.entity.Product;
+import com.awesome.backend.inbound.repository.CategoryRepository;
+import com.awesome.backend.inbound.repository.KoreanNetMasterRepository;
+import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.inbound.scan.dto.ManualProductRequest;
 import com.awesome.backend.inbound.scan.dto.ProductSummary;
 import com.awesome.backend.inbound.scan.dto.ScanResponse;
@@ -47,14 +47,14 @@ public class InboundScanService {
             ScanJudgment judgment = product.hasConfirmedDimensions()
                     ? ScanJudgment.REGISTERED
                     : ScanJudgment.NEW;
-            return ScanResponse.of(judgment, ProductSummary.from(product));
+            return ScanResponse.of(judgment, ProductSummary.from(product, categoryOf(product)));
         }
 
         return koreanNetMasterRepository.findByGtin(barcode)
                 .map(master -> {
                     Product created = productRepository.save(
                             Product.fromMaster(master, resolveImageUrl(master)));
-                    return ScanResponse.of(ScanJudgment.NEW, ProductSummary.from(created));
+                    return ScanResponse.of(ScanJudgment.NEW, ProductSummary.from(created, categoryOf(created)));
                 })
                 .orElseGet(ScanResponse::unknown);
     }
@@ -80,13 +80,21 @@ public class InboundScanService {
         }
 
         Product product = productRepository.save(
-                Product.manual(request.gtin(), request.name(), category, Product.PLACEHOLDER_IMAGE_URL));
-        return ProductSummary.from(product);
+                Product.manual(request.gtin(), request.name(), category.getCode(), Product.PLACEHOLDER_IMAGE_URL));
+        return ProductSummary.from(product, category);
     }
 
     /** 마스터에 이미지가 없으면 대체 주소를 쓴다 — product.image_url 이 NOT NULL 이라 값이 필요하다. */
     private String resolveImageUrl(KoreanNetMaster master) {
         String imageUrl = master.getImageUrl();
         return (imageUrl == null || imageUrl.isBlank()) ? Product.PLACEHOLDER_IMAGE_URL : imageUrl;
+    }
+
+    /** Product 는 medium_category_code 만 값으로 들고 있어서, 이름이 필요하면 여기서 조회한다. */
+    private Category categoryOf(Product product) {
+        return categoryRepository.findById(product.mediumCategoryCode())
+                .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_ERROR,
+                        "상품의 분류 코드가 존재하지 않습니다.",
+                        Map.of("mediumCategoryCode", product.mediumCategoryCode())));
     }
 }
