@@ -37,6 +37,8 @@ P3 담당. 계약 정본은 docs 저장소이며, 여기서 확정된 계약 변
 [결과 요약 응답]
 ```
 
+**도메인 간 접근 규칙 [확정]**: orders(P3)는 타 도메인의 엔티티·리포지토리를 직접 쓰지 않고, 각 도메인의 application 인터페이스만 의존한다 — inbound는 ProductCatalog(읽기 전용), inventory는 AvailableStockQuery·StockMovementRecorder, outbound는 ShipmentRegistrar(U3 신설). 도메인 소유자(P1·P2)는 인터페이스 계약만 지키면 내부를 자유롭게 바꾼다.
+
 ## 2. A1 — 출고지시 접수 [확정]
 
 ```json
