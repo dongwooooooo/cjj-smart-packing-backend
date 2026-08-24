@@ -4,6 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.awesome.backend.inventory.service.InventoryService;
 import com.awesome.backend.orders.entity.Order;
 import com.awesome.backend.orders.repository.OrderRepository;
 import java.time.LocalDateTime;
@@ -23,8 +24,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * 명세 §7 테스트 20번 — 1층 검증(배치 전체 400 VALIDATION_ERROR).
- * U1 범위는 접수 계층까지라 서비스는 스텁이다. 여기서 확인하는 건
- * 요청이 통과하느냐 전체 거부되느냐와 에러 포맷(§0 공통 에러)뿐이다.
+ * 여기서 확인하는 건 요청이 통과하느냐 배치 전체가 거부되느냐와
+ * 에러 포맷(§0 공통 에러)이다. 주문별 거부(2층)는 OrdersImportRejectionIT가 맡는다.
  *
  * MockMvc는 @AutoConfigureMockMvc 대신 WebApplicationContext로 직접 만든다 —
  * Spring Boot 4.1의 starter-test에 해당 오토컨피그 모듈이 없다.
@@ -47,6 +48,7 @@ class OrdersImportControllerIT {
 
     @Autowired WebApplicationContext context;
     @Autowired OrderRepository orderRepository;
+    @Autowired InventoryService inventoryService;
 
     private MockMvc mvc;
 
@@ -57,6 +59,10 @@ class OrdersImportControllerIT {
 
     @Test
     void 정상_배치는_접수된다() throws Exception {
+        // 2층 검증(§3)이 가용재고를 보므로, 통과하려면 재고가 있어야 한다
+        inventoryService.recordInbound(JUICE, 3);
+        inventoryService.recordInbound(CHIP, 1);
+
         String body = """
                 {
                   "batchId": "B-0821-1",
