@@ -12,19 +12,22 @@ import org.springframework.transaction.annotation.Transactional;
  * 배송단위 생성 창구. 테이블 주인은 P2지만 생성 시점은 P3의 출고지시 접수라,
  * 만드는 경로를 여기 하나로 모은다 (명세 §6).
  *
- * <p>토트 할당과 상태 전이는 여기서 하지 않는다 — 배송단위는 PLANNED로 만들어지고,
- * 토트가 붙는 건 U4다.
+ * <p>배송단위를 만들면 곧바로 토트를 붙인다. 토트 없는 배송단위는 작업자가 집을 수
+ * 없으니 계획 상태로 남겨둘 이유가 없다 (§6).
  */
 @Service
 public class ShipmentRegistrar {
 
     private final ShipmentRepository shipmentRepository;
     private final ShipmentItemRepository shipmentItemRepository;
+    private final ToteAllocator toteAllocator;
 
     public ShipmentRegistrar(ShipmentRepository shipmentRepository,
-                             ShipmentItemRepository shipmentItemRepository) {
+                             ShipmentItemRepository shipmentItemRepository,
+                             ToteAllocator toteAllocator) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
+        this.toteAllocator = toteAllocator;
     }
 
     /** 한 주문의 배송단위 전부를 저장한다. 호출자의 트랜잭션에 참여한다. */
@@ -37,6 +40,8 @@ public class ShipmentRegistrar {
                 shipmentItemRepository.save(
                         new ShipmentItem(shipment.id(), item.productId(), item.qty()));
             }
+            toteAllocator.allocate(shipment.id());
+            shipment.assignTote();
         }
     }
 }

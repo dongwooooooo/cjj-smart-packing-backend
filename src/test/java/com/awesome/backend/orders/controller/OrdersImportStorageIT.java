@@ -10,7 +10,11 @@ import com.awesome.backend.inventory.service.InventoryService;
 import com.awesome.backend.orders.entity.Order;
 import com.awesome.backend.orders.repository.OrderRepository;
 import com.awesome.backend.outbound.entity.Shipment;
+import com.awesome.backend.outbound.entity.Tote;
+import com.awesome.backend.outbound.entity.ToteAssignment;
 import com.awesome.backend.outbound.repository.ShipmentItemRepository;
+import com.awesome.backend.outbound.repository.ToteAssignmentRepository;
+import com.awesome.backend.outbound.repository.ToteRepository;
 import com.awesome.backend.outbound.repository.ShipmentRepository;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,8 +33,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * 명세 §7 19번(저장·응답 수치) + §4-3 초과 치수 거부 + §5 라인 배정.
- * 토트 할당과 상태 전이 검증은 U4에서 이 자리에 붙는다.
+ * 명세 §7 19번(저장·상태 전이·토트·응답 수치) + §4-3 초과 치수 거부 + §5 라인 배정.
  *
  * <p>시연 상품은 seed에서 치수가 비어 있다(dim_status=NONE). 편성은 치수가 있어야
  * 돌아가므로 테스트마다 필요한 상품의 치수를 직접 채운다 — 입고 촬영으로 확정되는
@@ -57,6 +60,8 @@ class OrdersImportStorageIT {
     @Autowired ProductRepository productRepository;
     @Autowired ShipmentRepository shipmentRepository;
     @Autowired ShipmentItemRepository shipmentItemRepository;
+    @Autowired ToteRepository toteRepository;
+    @Autowired ToteAssignmentRepository toteAssignmentRepository;
     @Autowired JdbcTemplate jdbcTemplate;
 
     private MockMvc mvc;
@@ -99,14 +104,49 @@ class OrdersImportStorageIT {
 
         Order saved = orderRepository.findAll().stream()
                 .filter(o -> o.receiptNo().equals("R-1")).findFirst().orElseThrow();
-        assertThat(saved.status()).isEqualTo(Order.Status.RECEIVED);
+        assertThat(saved.status()).isEqualTo(Order.Status.ALLOCATED);
 
         List<Shipment> shipments = shipmentRepository.findByOrderIdOrderBySeqNoAsc(saved.id());
         assertThat(shipments).hasSize(1);
-        assertThat(shipments.getFirst().status()).isEqualTo(Shipment.Status.PLANNED);
+        Shipment shipment = shipments.getFirst();
+        assertThat(shipment.status()).isEqualTo(Shipment.Status.TOTE_ASSIGNED);
+
+        ToteAssignment assignment = toteAssignmentRepository
+                .findByShipmentIdAndReleasedAtIsNull(shipment.id()).orElseThrow();
+        Tote tote = toteRepository.findById(assignment.toteId()).orElseThrow();
+        assertThat(tote.status()).isEqualTo(Tote.Status.ASSIGNED);
 
         Long chipId = productRepository.findByGtin(CHIP).orElseThrow().id();
         assertThat(shipmentItemRepository.allocatedQty(chipId)).isEqualTo(3);
+    }
+
+    @Test
+    void 배송단위가_나뉘면_토트도_따로_붙는다() throws Exception {
+        dimensions(RAMEN, 30.0, 30.0, 30.0);
+        inventoryService.recordInbound(RAMEN, 10);
+
+        mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content("""
+                        {
+                          "batchId": "B-0821-1",
+                          "orders": [
+                            { "receiptNo": "R-1", "regionCode": "SEOUL",
+                              "orderedAt": "2026-08-21T09:00:00",
+                              "items": [ { "gtin": "%s", "qty": 2 } ] }
+                          ]
+                        }
+                        """.formatted(RAMEN)))
+                .andExpect(status().isOk());
+
+        Long orderId = orderRepository.findAll().stream()
+                .filter(o -> o.receiptNo().equals("R-1")).findFirst().orElseThrow().id();
+        List<Shipment> shipments = shipmentRepository.findByOrderIdOrderBySeqNoAsc(orderId);
+        assertThat(shipments).hasSize(2);
+
+        List<Long> toteIds = shipments.stream()
+                .map(s -> toteAssignmentRepository.findByShipmentIdAndReleasedAtIsNull(s.id())
+                        .orElseThrow().toteId())
+                .toList();
+        assertThat(toteIds).doesNotHaveDuplicates();
     }
 
     @Test
