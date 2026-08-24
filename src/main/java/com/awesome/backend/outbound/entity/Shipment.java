@@ -77,6 +77,14 @@ public class Shipment {
         return status;
     }
 
+    public int seqNo() {
+        return seqNo;
+    }
+
+    public Long lineId() {
+        return lineId;
+    }
+
     public void assignTote() {
         this.status = Status.TOTE_ASSIGNED;
     }
