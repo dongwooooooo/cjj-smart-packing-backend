@@ -2,7 +2,7 @@ package com.awesome.backend.orders.application;
 
 import com.awesome.backend.common.error.ApiException;
 import com.awesome.backend.common.error.ErrorCode;
-import com.awesome.backend.inbound.domain.ProductRepository;
+import com.awesome.backend.inbound.application.ProductCatalog;
 import com.awesome.backend.orders.domain.OrderRepository;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -14,17 +14,20 @@ import org.springframework.stereotype.Component;
  * 명세 §3 1층 중 조회가 필요한 검증. 형식 검증(필수 필드·수량·빈 배열)은
  * 요청 DTO의 bean validation이 맡고, 여기서는 기준정보·기존 접수 이력과 대조한다.
  *
+ * <p>상품 마스터는 ProductCatalog 경계로만 본다 — orders는 타 도메인의 엔티티·리포지토리를
+ * 직접 쓰지 않는다.
+ *
  * <p>위반은 전부 배치 전체 400 VALIDATION_ERROR다. 미등록 GTIN을 건별 거부가 아니라
  * 전체 거부로 두는 건 시연 데이터를 통제하기 때문이며, 상용 API와의 의도적 차이다 (§3).
  */
 @Component
 public class BatchIntakeValidator {
 
-    private final ProductRepository productRepository;
+    private final ProductCatalog productCatalog;
     private final OrderRepository orderRepository;
 
-    public BatchIntakeValidator(ProductRepository productRepository, OrderRepository orderRepository) {
-        this.productRepository = productRepository;
+    public BatchIntakeValidator(ProductCatalog productCatalog, OrderRepository orderRepository) {
+        this.productCatalog = productCatalog;
         this.orderRepository = orderRepository;
     }
 
@@ -73,7 +76,7 @@ public class BatchIntakeValidator {
                 .map(OrderImportCommand.ItemLine::gtin)
                 .distinct()
                 .toList();
-        Set<String> known = Set.copyOf(productRepository.findKnownGtins(gtins));
+        Set<String> known = Set.copyOf(productCatalog.findKnownGtins(gtins));
         List<String> unknown = gtins.stream().filter(gtin -> !known.contains(gtin)).toList();
         if (!unknown.isEmpty()) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR,
