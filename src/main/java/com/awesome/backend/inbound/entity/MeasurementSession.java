@@ -49,7 +49,7 @@ public class MeasurementSession {
     @Column(name = "status", length = 15, nullable = false)
     private MeasurementStatus status;
 
-    /** 모델이 출력한 원본값. 축 규약(D-15) 정렬을 적용하지 않고 그대로 보존한다. */
+    /** 추론 치수. 축 규약(D-15)에 맞춰 가로·세로를 정렬한 뒤 저장한다 (02 §1-3). */
     @Column(name = "inferred_width_cm", precision = 5, scale = 1)
     private BigDecimal inferredWidthCm;
 
