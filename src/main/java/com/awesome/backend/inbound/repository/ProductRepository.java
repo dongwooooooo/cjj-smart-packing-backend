@@ -14,7 +14,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByGtin(String gtin);
 
+    /** 편성 입력용 — 배치의 GTIN들을 쿼리 1번으로 조회. */
     List<Product> findByGtinIn(Collection<String> gtins);
+
+    /** 수기 등록(1-2) 중복 바코드 검증용. ⚠️ 1-2는 D-21로 삭제된 API — P1 확인 필요. */
+    boolean existsByGtin(String gtin);
 
     /** 배치 접수 검증용 — 넘긴 바코드 중 상품 마스터에 있는 것만 돌려준다. */
     @Query("select p.gtin from Product p where p.gtin in :gtins")
