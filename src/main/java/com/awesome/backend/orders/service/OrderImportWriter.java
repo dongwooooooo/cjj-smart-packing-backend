@@ -19,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
  * 심사를 통과한 주문을 저장한다 (명세 §6). 호출자의 트랜잭션에 참여하므로
  * 중간에 실패하면 배치 전체가 함께 되돌아간다 — 부분 커밋은 없다.
  *
- * <p>주문은 접수(RECEIVED) 상태로 만든다. 할당완료로 넘기는 건 토트가 붙는 U4다.
+ * <p>주문은 접수(RECEIVED)로 만들어 배송단위·토트까지 붙인 뒤 할당완료(ALLOCATED)로
+ * 넘긴다. 상태가 곧 "작업자에게 내보낼 준비가 됐는지"라, 토트가 붙기 전에 미리
+ * 넘기지 않는다.
  */
 @Component
 public class OrderImportWriter {
@@ -47,6 +49,7 @@ public class OrderImportWriter {
             saveItems(order.id(), line, plans);
             shipmentRegistrar.register(order.id(), acceptedOrder.lineId(),
                     drafts(acceptedOrder.plans(), plans));
+            order.allocate();
 
             shipments += acceptedOrder.plans().size();
             if (acceptedOrder.plans().size() > 1) {
