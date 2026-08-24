@@ -21,6 +21,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class BatchIntakeValidator {
 
+    private static final String DIM_CONFIRMED = "CONFIRMED";
+
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
 
@@ -81,9 +83,13 @@ public class BatchIntakeValidator {
     }
 
     /**
-     * 치수가 비어 있으면 편성을 돌릴 수 없다. 시연에서는 입고 촬영으로 치수가 확정된
-     * 상품만 주문에 실린다는 전제라, 여기 걸리는 건 전제를 벗어난 입력이다 — 1층과 같이
-     * 배치 전체를 거부하고 어느 상품인지 알려준다.
+     * 센터가 치수를 가졌는지는 dim_status가 정본이다 (docs/03-erd.md). 치수 컬럼은
+     * 확정 전까지 비어 있는 게 정상이고, 추론값만 들어온 상태도 CONFIRMED가 아니다.
+     * 시연에서는 입고 측정으로 확정된 상품만 주문에 실린다는 전제라, 여기 걸리는 건
+     * 전제를 벗어난 입력이다 — 1층과 같이 배치 전체를 거부하고 어느 상품인지 알려준다.
+     *
+     * <p>확정 표시가 붙었는데 치수가 비어 있는 행도 함께 막는다. 흐름상 나올 수 없는
+     * 조합이지만, 통과시키면 편성에서 null을 만나 500으로 떨어진다.
      */
     private void rejectUndimensionedProducts(OrderImportCommand command) {
         List<String> gtins = gtins(command);
@@ -91,12 +97,16 @@ public class BatchIntakeValidator {
             return;
         }
         for (Product product : productRepository.findByGtinIn(gtins)) {
-            if (product.widthCm() == null || product.lengthCm() == null || product.heightCm() == null) {
+            if (!DIM_CONFIRMED.equals(product.dimStatus()) || hasEmptyDimension(product)) {
                 throw new ApiException(ErrorCode.VALIDATION_ERROR,
                         "치수가 확정되지 않은 상품이 포함돼 있습니다.",
                         Map.of("gtin", product.gtin()));
             }
         }
+    }
+
+    private boolean hasEmptyDimension(Product product) {
+        return product.widthCm() == null || product.lengthCm() == null || product.heightCm() == null;
     }
 
     private List<String> gtins(OrderImportCommand command) {

@@ -242,6 +242,30 @@ class OrdersImportStorageIT {
     }
 
     @Test
+    void 치수는_있어도_확정_전이면_배치_전체를_거부한다() throws Exception {
+        // 비전 추론값만 들어오고 작업자 확정 전인 상태. 센터 치수 보유 여부의 정본은 dim_status다
+        jdbcTemplate.update("""
+                update product set width_cm = 5.0, length_cm = 5.0, height_cm = 2.0, dim_status = 'NONE'
+                where gtin = ?
+                """, CHIP);
+        inventoryService.recordInbound(CHIP, 10);
+
+        mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content("""
+                        {
+                          "batchId": "B-0821-1",
+                          "orders": [
+                            { "receiptNo": "R-1", "regionCode": "SEOUL",
+                              "orderedAt": "2026-08-21T09:00:00",
+                              "items": [ { "gtin": "%s", "qty": 1 } ] }
+                          ]
+                        }
+                        """.formatted(CHIP)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.detail.gtin").value(CHIP));
+    }
+
+    @Test
     void 치수가_확정되지_않은_상품이_있으면_배치_전체를_거부한다() throws Exception {
         inventoryService.recordInbound(CHIP, 10);
 
