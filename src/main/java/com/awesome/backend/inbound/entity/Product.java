@@ -27,8 +27,9 @@ public class Product {
     public static final String DIM_STATUS_NONE = "NONE";
     public static final String DIM_STATUS_CONFIRMED = "CONFIRMED";
 
+    // 스키마(V1 CHECK)에는 'MANUAL' 값이 남아 있지만 만드는 경로가 없다 — 유일한 생성처였던
+    // 1-2 가 D-21 로 삭제됐다. ENUM 정리는 마이그레이션 수정 + 볼륨 재적재가 필요해 후속 과제.
     public static final String SOURCE_MASTER = "MASTER";
-    public static final String SOURCE_MANUAL = "MANUAL";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -99,11 +100,6 @@ public class Product {
     public static Product fromMaster(KoreanNetMaster master, String imageUrl) {
         return new Product(master.getGtin(), master.getProductName(),
                 master.getMediumCategory().getCode(), imageUrl, SOURCE_MASTER);
-    }
-
-    /** 미등록 바코드를 작업자가 수기 등록했을 때 생성한다 (1-2). */
-    public static Product manual(String gtin, String name, String mediumCategoryCode, String imageUrl) {
-        return new Product(gtin, name, mediumCategoryCode, imageUrl, SOURCE_MANUAL);
     }
 
     public boolean hasConfirmedDimensions() {
