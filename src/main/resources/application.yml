@@ -23,6 +23,11 @@ management:
       exposure:
         include: health
 
+packing:
+  # 명세 §4-6. margin-cm은 D-11 확정값, filler-thickness-cm은 리허설 때 조정할 임의값
+  margin-cm: 3.0
+  filler-thickness-cm: 1.0
+
 inference:
   api-url: ${INFERENCE_API_URL:}
   timeout-seconds: ${INFERENCE_TIMEOUT_SECONDS:8}

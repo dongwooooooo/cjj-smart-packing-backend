@@ -14,6 +14,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByGtin(String gtin);
 
+    List<Product> findByGtinIn(Collection<String> gtins);
+
     /** 배치 접수 검증용 — 넘긴 바코드 중 상품 마스터에 있는 것만 돌려준다. */
     @Query("select p.gtin from Product p where p.gtin in :gtins")
     List<String> findKnownGtins(@Param("gtins") Collection<String> gtins);

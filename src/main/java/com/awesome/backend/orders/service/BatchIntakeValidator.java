@@ -2,6 +2,7 @@ package com.awesome.backend.orders.service;
 
 import com.awesome.backend.common.error.ApiException;
 import com.awesome.backend.common.error.ErrorCode;
+import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.orders.repository.OrderRepository;
 import java.util.LinkedHashSet;
@@ -32,6 +33,7 @@ public class BatchIntakeValidator {
         rejectDuplicateReceiptNos(command);
         rejectAlreadyImported(command);
         rejectUnknownGtins(command);
+        rejectUndimensionedProducts(command);
     }
 
     /** 배치 안에서 주문번호가 겹치면, 저장 단계까지 가봐야 UNIQUE 제약에 걸린다. 접수에서 끊는다. */
@@ -68,11 +70,7 @@ public class BatchIntakeValidator {
     }
 
     private void rejectUnknownGtins(OrderImportCommand command) {
-        List<String> gtins = command.orders().stream()
-                .flatMap(order -> order.items().stream())
-                .map(OrderImportCommand.ItemLine::gtin)
-                .distinct()
-                .toList();
+        List<String> gtins = gtins(command);
         Set<String> known = gtins.isEmpty() ? Set.of() : Set.copyOf(productRepository.findKnownGtins(gtins));
         List<String> unknown = gtins.stream().filter(gtin -> !known.contains(gtin)).toList();
         if (!unknown.isEmpty()) {
@@ -80,5 +78,32 @@ public class BatchIntakeValidator {
                     "상품 마스터에 없는 바코드가 포함돼 있습니다.",
                     Map.of("unknownGtins", unknown));
         }
+    }
+
+    /**
+     * 치수가 비어 있으면 편성을 돌릴 수 없다. 시연에서는 입고 촬영으로 치수가 확정된
+     * 상품만 주문에 실린다는 전제라, 여기 걸리는 건 전제를 벗어난 입력이다 — 1층과 같이
+     * 배치 전체를 거부하고 어느 상품인지 알려준다.
+     */
+    private void rejectUndimensionedProducts(OrderImportCommand command) {
+        List<String> gtins = gtins(command);
+        if (gtins.isEmpty()) {
+            return;
+        }
+        for (Product product : productRepository.findByGtinIn(gtins)) {
+            if (product.widthCm() == null || product.lengthCm() == null || product.heightCm() == null) {
+                throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                        "치수가 확정되지 않은 상품이 포함돼 있습니다.",
+                        Map.of("gtin", product.gtin()));
+            }
+        }
+    }
+
+    private List<String> gtins(OrderImportCommand command) {
+        return command.orders().stream()
+                .flatMap(order -> order.items().stream())
+                .map(OrderImportCommand.ItemLine::gtin)
+                .distinct()
+                .toList();
     }
 }

@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,11 +51,24 @@ class OrdersImportControllerIT {
     @Autowired OrderRepository orderRepository;
     @Autowired InventoryService inventoryService;
 
+    @Autowired JdbcTemplate jdbcTemplate;
+
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.webAppContextSetup(context).build();
+        // 편성은 치수가 있어야 돌아간다. seed 상품은 치수가 비어 있어(dim_status=NONE)
+        // 입고 촬영으로 확정될 값을 여기서 미리 채운다.
+        dimensions(JUICE, 5.0, 5.0, 2.0);
+        dimensions(CHIP, 5.0, 5.0, 2.0);
+    }
+
+    private void dimensions(String gtin, double widthCm, double lengthCm, double heightCm) {
+        jdbcTemplate.update("""
+                update product set width_cm = ?, length_cm = ?, height_cm = ?, dim_status = 'CONFIRMED'
+                where gtin = ?
+                """, widthCm, lengthCm, heightCm, gtin);
     }
 
     @Test
