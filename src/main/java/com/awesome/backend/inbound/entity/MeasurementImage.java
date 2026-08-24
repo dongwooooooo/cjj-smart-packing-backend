@@ -1,4 +1,4 @@
-package com.awesome.backend.inbound.measurement;
+package com.awesome.backend.inbound.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

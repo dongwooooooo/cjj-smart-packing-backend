@@ -1,6 +1,6 @@
-package com.awesome.backend.inbound.scan.dto;
+package com.awesome.backend.inbound.controller;
 
-import com.awesome.backend.inbound.scan.ScanJudgment;
+import com.awesome.backend.inbound.service.ScanJudgment;
 
 /** 스캔 응답 (1-1). 세 케이스가 같은 형태를 쓰며, UNKNOWN 이면 product 가 null 이다. */
 public record ScanResponse(String judgment, ProductSummary product) {

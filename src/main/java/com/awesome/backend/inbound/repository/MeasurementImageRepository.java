@@ -1,5 +1,6 @@
-package com.awesome.backend.inbound.measurement;
+package com.awesome.backend.inbound.repository;
 
+import com.awesome.backend.inbound.entity.MeasurementImage;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 

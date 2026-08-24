@@ -1,9 +1,6 @@
-package com.awesome.backend.inbound.scan;
+package com.awesome.backend.inbound.controller;
 
-import com.awesome.backend.inbound.scan.dto.ManualProductRequest;
-import com.awesome.backend.inbound.scan.dto.ProductSummary;
-import com.awesome.backend.inbound.scan.dto.ScanRequest;
-import com.awesome.backend.inbound.scan.dto.ScanResponse;
+import com.awesome.backend.inbound.service.InboundScanService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

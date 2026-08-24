@@ -1,4 +1,4 @@
-package com.awesome.backend.inbound.scan;
+package com.awesome.backend.inbound.service;
 
 import com.awesome.backend.common.error.ApiException;
 import com.awesome.backend.common.error.ErrorCode;
@@ -9,9 +9,9 @@ import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.CategoryRepository;
 import com.awesome.backend.inbound.repository.KoreanNetMasterRepository;
 import com.awesome.backend.inbound.repository.ProductRepository;
-import com.awesome.backend.inbound.scan.dto.ManualProductRequest;
-import com.awesome.backend.inbound.scan.dto.ProductSummary;
-import com.awesome.backend.inbound.scan.dto.ScanResponse;
+import com.awesome.backend.inbound.controller.ManualProductRequest;
+import com.awesome.backend.inbound.controller.ProductSummary;
+import com.awesome.backend.inbound.controller.ScanResponse;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
