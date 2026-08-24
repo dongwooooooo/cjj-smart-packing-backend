@@ -2,7 +2,6 @@ package com.awesome.backend.orders.application;
 
 import com.awesome.backend.common.error.ApiException;
 import com.awesome.backend.common.error.ErrorCode;
-import com.awesome.backend.inbound.application.ProductCatalog;
 import com.awesome.backend.orders.domain.OrderRepository;
 import java.util.LinkedHashSet;
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.awesome.backend.inbound.application;
+package com.awesome.backend.orders.application;
 
 import java.util.List;
 
