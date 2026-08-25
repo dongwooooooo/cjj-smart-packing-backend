@@ -68,27 +68,22 @@ curl -s localhost:8000/api/v1/admin/demo/status | python3 -m json.tool
 풀별 상품(치수 상태·재고), 대기열 배치와 투입 여부, 토트·박스 현황, 접수된 주문·배송단위
 수가 나온다. 여기에도 같은 `summary`가 들어 있다.
 
-## 3. 출고지시 접수
+## 3. 출고지시 투입
 
-대기열에서 배치를 꺼내 넣는 API는 아직 없다(DM3). 지금은 대기열의 배치를 직접 꺼내
-접수한다.
-
-```bash
-BATCH=$(docker compose exec -T db psql -U app -d app -tA -c \
-  "select batch_json from demo_order_queue
-    where released_at is null order by seq asc limit 1")
-curl -s -X POST localhost:8000/api/v1/admin/orders/import \
-     -H 'Content-Type: application/json' -d "$BATCH" | python3 -m json.tool
-```
-
-배치를 넣어도 대기열에는 아직 "투입됨" 표시가 남지 않는다. 표시까지 남기려면 아래를
-함께 실행한다 — 투입 API(DM3)가 붙으면 이 두 단계가 한 번으로 합쳐진다.
+대기열에서 배치를 하나씩 꺼내 접수한다. 누를 때마다 화면이 한 단계씩 채워진다.
 
 ```bash
-docker compose exec -T db psql -U app -d app -c \
-  "update demo_order_queue set released_at = now()
-    where seq = (select min(seq) from demo_order_queue where released_at is null)"
+curl -s -X POST localhost:8000/api/v1/admin/demo/orders/next | python3 -m json.tool
 ```
+
+```json
+{
+  "seq": 1, "remaining": 2, "batchId": "DEMO-1",
+  "orders": 1, "shipments": 1, "splitOrders": 0, "rejected": []
+}
+```
+
+`seq`가 방금 나간 배치, `remaining`이 남은 배치 수다. 대기열이 비면 204(내용 없음)가 온다.
 
 배치 3개를 순서대로 넣으면 케이스가 차례로 나온다.
 
@@ -101,6 +96,26 @@ docker compose exec -T db psql -U app -d app -c \
 배치마다 보여줄 장면이 하나씩이라, 투입할 때마다 화면에서 달라지는 게 뚜렷하다.
 시연 시나리오에는 거부되는 주문이 없다 — 부분 성공(일부 주문만 거부되고 나머지는 접수)은
 기능과 테스트에는 있지만 시연 화면으로는 다루지 않는다.
+
+### 손대지 않고 흘려보내기
+
+발표하면서 직접 누르기 어려우면 자동 투입을 켠다.
+
+```bash
+curl -s -X POST "localhost:8000/api/v1/admin/demo/orders/auto?intervalSeconds=20"
+```
+
+20초마다 배치가 하나씩 들어간다. 간격은 1~600초. 대기열이 비면 스스로 멈춘다.
+
+```bash
+curl -s -X DELETE localhost:8000/api/v1/admin/demo/orders/auto   # 정지
+```
+
+이미 돌고 있는데 다시 시작하면 409다. 간격을 바꾸려면 정지하고 다시 시작한다.
+지금 돌고 있는지는 `status`의 `auto`에서 확인한다. 서버를 다시 띄우면 꺼진 상태로 시작한다.
+
+투입이 실패하면 자동 투입은 멈추고 그 배치는 대기열에 남는다. 원인을 고친 뒤
+`next`로 다시 넣으면 된다.
 
 ## 4. 저장 결과 확인
 

@@ -42,6 +42,7 @@ public class DemoResetService {
     private final BoxTypeRepository boxTypeRepository;
     private final OrderRepository orderRepository;
     private final ShipmentRepository shipmentRepository;
+    private final DemoAutoFeeder autoFeeder;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DemoResetService(DemoDataLoader loader, DemoDataProperties properties,
@@ -50,7 +51,7 @@ public class DemoResetService {
                             DemoProductRepository demoProductRepository,
                             ProductRepository productRepository, ToteRepository toteRepository,
                             BoxTypeRepository boxTypeRepository, OrderRepository orderRepository,
-                            ShipmentRepository shipmentRepository) {
+                            ShipmentRepository shipmentRepository, DemoAutoFeeder autoFeeder) {
         this.loader = loader;
         this.properties = properties;
         this.resetter = resetter;
@@ -62,6 +63,7 @@ public class DemoResetService {
         this.boxTypeRepository = boxTypeRepository;
         this.orderRepository = orderRepository;
         this.shipmentRepository = shipmentRepository;
+        this.autoFeeder = autoFeeder;
     }
 
     @Transactional
@@ -124,6 +126,7 @@ public class DemoResetService {
                 new DemoStatus.Totes(idle, assigned),
                 new DemoStatus.BoxTypes(boxes, boxStock),
                 new DemoStatus.Progress(orders, shipments),
+                new DemoStatus.Auto(autoFeeder.isRunning(), autoFeeder.intervalSeconds()),
                 summaryText(inbound, outbound, batches.size(), batches.size() - waiting,
                         idle, assigned, boxes, boxStock, orders, shipments));
     }

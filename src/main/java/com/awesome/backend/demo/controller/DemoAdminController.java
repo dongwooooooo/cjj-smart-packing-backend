@@ -1,10 +1,17 @@
 package com.awesome.backend.demo.controller;
 
+import com.awesome.backend.demo.service.DemoAutoFeeder;
+import com.awesome.backend.demo.service.DemoNextResult;
+import com.awesome.backend.demo.service.DemoOrderFeeder;
 import com.awesome.backend.demo.service.DemoResetService;
 import com.awesome.backend.demo.service.DemoResetSummary;
 import com.awesome.backend.demo.service.DemoStatus;
 import io.swagger.v3.oas.annotations.Operation;
+import java.util.Optional;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,9 +22,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class DemoAdminController {
 
     private final DemoResetService demoResetService;
+    private final DemoOrderFeeder demoOrderFeeder;
+    private final DemoAutoFeeder demoAutoFeeder;
 
-    public DemoAdminController(DemoResetService demoResetService) {
+    public DemoAdminController(DemoResetService demoResetService, DemoOrderFeeder demoOrderFeeder,
+                               DemoAutoFeeder demoAutoFeeder) {
         this.demoResetService = demoResetService;
+        this.demoOrderFeeder = demoOrderFeeder;
+        this.demoAutoFeeder = demoAutoFeeder;
     }
 
     @Operation(summary = "시연 리셋",
@@ -37,5 +49,32 @@ public class DemoAdminController {
     @GetMapping("/status")
     public DemoStatus status() {
         return demoResetService.status();
+    }
+
+    @Operation(summary = "출고지시 한 건 투입",
+            description = "대기열 맨 앞 배치를 꺼내 접수한다. 응답에 접수 결과와 남은 배치 수가 "
+                    + "함께 들어 있다. 대기열이 비어 있으면 204를 돌려준다. "
+                    + "접수가 실패하면 그 배치는 대기열에 그대로 남는다.")
+    @PostMapping("/orders/next")
+    public ResponseEntity<DemoNextResult> next() {
+        Optional<DemoNextResult> result = demoOrderFeeder.feedNext();
+        return result.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @Operation(summary = "자동 투입 시작",
+            description = "정해진 간격(1~600초)으로 배치를 하나씩 자동 투입한다. 대기열이 비거나 "
+                    + "투입이 실패하면 스스로 멈춘다. 이미 돌고 있으면 409 — 간격을 바꾸려면 "
+                    + "멈춘 뒤 다시 시작한다. 서버를 다시 띄우면 꺼진 상태로 시작한다.")
+    @PostMapping("/orders/auto")
+    public void startAuto(@RequestParam int intervalSeconds) {
+        demoAutoFeeder.start(intervalSeconds);
+    }
+
+    @Operation(summary = "자동 투입 정지",
+            description = "자동 투입을 멈춘다. 돌고 있지 않아도 오류가 아니다.")
+    @DeleteMapping("/orders/auto")
+    public void stopAuto() {
+        demoAutoFeeder.stop();
     }
 }
