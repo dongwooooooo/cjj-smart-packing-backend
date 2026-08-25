@@ -1,0 +1,398 @@
+# Redeploys the backend on the EC2 instance through AWS Systems Manager (SSM)
+# Run Command. No SSH key and no inbound port are involved: the runner assumes
+# an AWS role through GitHub OIDC and calls the SSM API, and the SSM agent
+# already present on the Ubuntu AMI executes the script on the instance.
+#
+# Unlike the sibling repo (cj-ai-sw/ai), the source is NOT carried inside the
+# command body. A Spring Boot source tree is far past the practical size of an
+# SSM command parameter, so the instance clones this repository itself using the
+# runner's short-lived GITHUB_TOKEN, which expires when the job ends.
+#
+# See docs/deploy.md for the one-time IAM/secret setup this workflow assumes.
+name: deploy-ec2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: '배포할 git ref (브랜치·태그·커밋 SHA). 비우면 main.'
+        required: false
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+  id-token: write
+
+# cancel-in-progress is off on purpose. A cancelled deploy can leave the
+# instance with new code and a half-built container, so an in-flight run is
+# allowed to finish and the next one queues behind it.
+concurrency:
+  group: deploy-ec2
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  DEFAULT_INSTANCE_ID: i-0c7dac45358b3fafc
+  # Time SSM allows the script itself to run. `docker compose up --build` runs a
+  # Gradle build inside the image, which takes several minutes on a small
+  # instance.
+  SSM_EXECUTION_TIMEOUT: '1800'
+  # How long this job polls for the command to finish before giving up.
+  POLL_TIMEOUT_SECONDS: '1800'
+  # How long the instance waits for /actuator/health to answer UP after the
+  # containers are up.
+  HEALTH_TIMEOUT_SECONDS: '300'
+
+jobs:
+  deploy-ec2:
+    name: deploy to ec2 via ssm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Both values are read through env rather than interpolated into the
+      # script body, and their shape is validated before they reach the AWS CLI
+      # or the instance.
+      - name: Resolve deploy target
+        id: target
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          VAR_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: |
+          set -euo pipefail
+          INSTANCE_ID="${VAR_INSTANCE_ID:-$DEFAULT_INSTANCE_ID}"
+          if ! printf '%s' "$INSTANCE_ID" | grep -Eq '^i-[0-9a-f]{8,17}$'; then
+            echo "::error::인스턴스 ID '${INSTANCE_ID}' 형식이 올바르지 않습니다. 예: i-0c7dac45358b3fafc"
+            exit 1
+          fi
+
+          # push 이벤트에는 입력값이 없다. 그때는 이 실행을 만든 커밋을 그대로 배포한다.
+          GIT_REF="${INPUT_REF:-}"
+          if [ -z "$GIT_REF" ]; then
+            GIT_REF="$GITHUB_SHA"
+          fi
+          if ! printf '%s' "$GIT_REF" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$'; then
+            echo "::error::git ref '${GIT_REF}' 형식이 올바르지 않습니다. 영문·숫자로 시작하고 영문·숫자·. _ / - 만 쓸 수 있습니다."
+            exit 1
+          fi
+          case "$GIT_REF" in
+            *..*)
+              echo "::error::git ref '${GIT_REF}' 에 '..' 가 들어 있습니다."
+              exit 1
+              ;;
+          esac
+
+          echo "instance_id=${INSTANCE_ID}" >> "$GITHUB_OUTPUT"
+          echo "git_ref=${GIT_REF}" >> "$GITHUB_OUTPUT"
+          echo "배포 대상: ${INSTANCE_ID} (${AWS_REGION}), ref ${GIT_REF}"
+
+      # A stopped instance, a missing instance profile, or an SSM agent that
+      # never registered all show up the same way: the instance is simply not in
+      # the managed list. Fail here with an actionable message instead of
+      # letting send-command return InvalidInstanceId.
+      - name: Check that the instance is managed by SSM
+        env:
+          INSTANCE_ID: ${{ steps.target.outputs.instance_id }}
+        run: |
+          set -euo pipefail
+          PING=$(aws ssm describe-instance-information \
+                   --region "$AWS_REGION" \
+                   --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
+                   --query 'InstanceInformationList[0].PingStatus' \
+                   --output text 2>/dev/null || echo "None")
+          if [ "$PING" != "Online" ]; then
+            echo "::error::인스턴스 ${INSTANCE_ID} 가 SSM 관리 대상이 아닙니다 (PingStatus=${PING}). 인스턴스가 실행 중인지, 인스턴스 프로파일에 AmazonSSMManagedInstanceCore 가 붙어 있는지 확인하세요. docs/deploy.md 참고."
+            exit 1
+          fi
+          echo "SSM 관리 상태 확인: ${INSTANCE_ID} (PingStatus=Online)"
+
+      # Written to a file rather than inlined in the SSM command list so the
+      # instance-side logic stays one readable bash script that `bash -n` can
+      # check. The SSM command body itself is plain POSIX sh (see the next step).
+      - name: Write instance-side deploy script
+        run: |
+          set -euo pipefail
+          cat > deploy-on-instance.sh <<'INSTANCE_SCRIPT'
+          #!/usr/bin/env bash
+          # Runs on the EC2 instance as the ubuntu user. Inputs arrive as
+          # exported environment variables: REPO_SLUG, REPO_TOKEN, GIT_REF,
+          # HEALTH_TIMEOUT_SECONDS.
+          set -euo pipefail
+
+          APP_DIR="$HOME/backend"
+          # The token never appears in this URL, in argv, or in .git/config. Git
+          # asks GIT_ASKPASS for the password instead, and that helper reads it
+          # from the environment of this process only.
+          REPO_URL="https://x-access-token@github.com/${REPO_SLUG}.git"
+          HEALTH_URL="http://127.0.0.1:8000/actuator/health"
+
+          ASKPASS="$(mktemp)"
+          trap 'rm -f "$ASKPASS"' EXIT
+          printf '%s\n' '#!/bin/sh' 'printf "%s\n" "$REPO_TOKEN"' > "$ASKPASS"
+          chmod 700 "$ASKPASS"
+          export GIT_ASKPASS="$ASKPASS"
+          export GIT_TERMINAL_PROMPT=0
+
+          BACKUP=""
+          if [ ! -d "$APP_DIR/.git" ]; then
+            # The directory was seeded by rsync, not by git. Keep it around
+            # instead of deleting it — it is the only copy of anything that was
+            # edited on the instance by hand.
+            if [ -e "$APP_DIR" ]; then
+              BACKUP="${APP_DIR}.bak.$(date +%Y%m%d%H%M%S)"
+              mv "$APP_DIR" "$BACKUP"
+              echo "기존 ${APP_DIR} 를 ${BACKUP} 으로 옮겼습니다 (git 저장소가 아님)."
+            fi
+            git clone --quiet "$REPO_URL" "$APP_DIR"
+            echo "저장소를 새로 받았습니다: ${APP_DIR}"
+            if [ -n "$BACKUP" ] && [ -f "${BACKUP}/.env" ]; then
+              cp "${BACKUP}/.env" "${APP_DIR}/.env"
+              echo ".env 를 백업에서 복사했습니다."
+            fi
+          fi
+
+          cd "$APP_DIR"
+          # Pin the remote to the tokenless URL so a repo cloned by an older
+          # revision of this script cannot keep a credential in .git/config.
+          git remote set-url origin "$REPO_URL"
+          git fetch --prune --tags --quiet origin "+refs/heads/*:refs/remotes/origin/*"
+
+          if git rev-parse --verify --quiet "refs/remotes/origin/${GIT_REF}^{commit}" >/dev/null; then
+            TARGET="refs/remotes/origin/${GIT_REF}"
+          elif git rev-parse --verify --quiet "${GIT_REF}^{commit}" >/dev/null; then
+            TARGET="$GIT_REF"
+          else
+            # A commit that no branch points at any more: ask for it directly.
+            git fetch --quiet origin "$GIT_REF"
+            TARGET="FETCH_HEAD"
+          fi
+          git reset --hard --quiet "$TARGET"
+          echo "체크아웃: ${GIT_REF} -> $(git rev-parse --short HEAD) $(git log -1 --pretty=%s)"
+
+          # .env is gitignored, so reset --hard leaves it alone. Losing it is
+          # not fatal — compose falls back to the defaults in docker-compose.yml
+          # — but those defaults will not match an existing database volume.
+          if [ ! -f .env ]; then
+            echo "경고: ${APP_DIR}/.env 가 없습니다. docker-compose.yml 의 기본값으로 뜹니다." >&2
+          fi
+
+          sudo docker compose up -d --build
+
+          DEADLINE=$(( $(date +%s) + HEALTH_TIMEOUT_SECONDS ))
+          echo "헬스체크 대기: ${HEALTH_URL} (최대 ${HEALTH_TIMEOUT_SECONDS}초)"
+          until curl -fsS --max-time 5 "$HEALTH_URL" 2>/dev/null | grep -q '"status":"UP"'; do
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+              echo "헬스체크가 ${HEALTH_TIMEOUT_SECONDS}초 안에 UP 이 되지 않았습니다." >&2
+              echo "----- docker compose ps -----" >&2
+              sudo docker compose ps >&2 || true
+              echo "----- docker compose logs backend --tail 50 -----" >&2
+              sudo docker compose logs backend --tail 50 >&2 || true
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "헬스체크 통과: $(curl -fsS --max-time 5 "$HEALTH_URL")"
+          INSTANCE_SCRIPT
+          bash -n deploy-on-instance.sh
+          echo "인스턴스 스크립트 문법 검사 통과 ($(wc -c < deploy-on-instance.sh) 바이트)"
+
+      # Composed in Python so every value that comes from a secret or an input
+      # goes through shlex.quote. Hand-rolled shell quoting inside YAML inside
+      # JSON is where this kind of step usually breaks on an unusual character.
+      #
+      # The request body written here contains the GITHUB_TOKEN in clear text.
+      # AWS keeps command parameters in the Run Command history for 30 days and
+      # there is no API to delete them. The token stops working when this job
+      # ends, so the window that matters is the job's own runtime.
+      # See docs/deploy.md, "토큰 노출 범위".
+      - name: Build SSM request
+        env:
+          INSTANCE_ID: ${{ steps.target.outputs.instance_id }}
+          GIT_REF: ${{ steps.target.outputs.git_ref }}
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import pathlib
+          import shlex
+
+          script_b64 = base64.b64encode(
+              pathlib.Path("deploy-on-instance.sh").read_bytes()
+          ).decode()
+
+          script_path = "/home/ubuntu/.deploy-backend.sh"
+          env_path = "/home/ubuntu/.deploy-backend.env"
+
+          exports = [
+              "export REPO_SLUG=" + shlex.quote(os.environ["GITHUB_REPOSITORY"]),
+              "export REPO_TOKEN=" + shlex.quote(os.environ["REPO_TOKEN"]),
+              "export GIT_REF=" + shlex.quote(os.environ["GIT_REF"]),
+              "export HEALTH_TIMEOUT_SECONDS="
+              + shlex.quote(os.environ["HEALTH_TIMEOUT_SECONDS"]),
+          ]
+
+          # Plain POSIX sh only. The SSM agent hands the script to /bin/sh,
+          # which is dash on Ubuntu, so `set -o pipefail`, arrays and [[ ]] are
+          # not available at this level. The instance script needs bash, so it
+          # is run through an explicit `bash`.
+          #
+          # Everything here runs as root, while the working copy, the docker
+          # compose project and the .env all belong to ubuntu. Git also refuses
+          # to touch a repository owned by another user. So the last line drops
+          # to ubuntu with -H, which also points HOME at /home/ubuntu.
+          commands = [
+              "set -e",
+              "umask 077",
+              f"SCRIPT={shlex.quote(script_path)}",
+              f"ENV_FILE={shlex.quote(env_path)}",
+              'trap \'rm -f "$SCRIPT" "$ENV_FILE"\' EXIT',
+              'if ! id -u ubuntu >/dev/null 2>&1; then echo "ubuntu 계정이 없습니다." >&2; exit 1; fi',
+              'if ! command -v docker >/dev/null 2>&1; then echo "docker 가 설치돼 있지 않습니다." >&2; exit 1; fi',
+              f"printf '%s' {shlex.quote(script_b64)} | base64 -d > \"$SCRIPT\"",
+              'chown ubuntu:ubuntu "$SCRIPT"',
+              'chmod 700 "$SCRIPT"',
+              # The token lands in a 0600 file rather than on a command line, so
+              # `ps aux` on the instance never shows it. The file is sourced and
+              # deleted in the same shell, and the EXIT trap removes it again if
+              # anything above fails.
+              "printf '%s\\n' {} > \"$ENV_FILE\"".format(
+                  " ".join(shlex.quote(line) for line in exports)
+              ),
+              'chown ubuntu:ubuntu "$ENV_FILE"',
+              'chmod 600 "$ENV_FILE"',
+              "sudo -H -u ubuntu bash -c '"
+              f". {env_path}; rm -f {env_path}; exec bash {script_path}'",
+          ]
+
+          request = {
+              "InstanceIds": [os.environ["INSTANCE_ID"]],
+              "DocumentName": "AWS-RunShellScript",
+              "Comment": "deploy-ec2 {}".format(os.environ.get("GITHUB_SHA", "")[:7])[:100],
+              "TimeoutSeconds": 600,
+              "Parameters": {
+                  "executionTimeout": [os.environ["SSM_EXECUTION_TIMEOUT"]],
+                  "commands": commands,
+              },
+          }
+          body = json.dumps(request)
+          pathlib.Path("ssm-request.json").write_text(body)
+          print("SSM 요청 본문 생성 완료 — 커맨드 줄 수:", len(commands), "/ 본문", len(body), "바이트")
+          PY
+
+      # send-command returns as soon as SSM accepts the request. The waiter caps
+      # out at 20 polls (100 seconds), far short of a Gradle build, so it is
+      # called in a loop bounded by POLL_TIMEOUT_SECONDS.
+      - name: Run the deploy script on the instance
+        id: run
+        env:
+          INSTANCE_ID: ${{ steps.target.outputs.instance_id }}
+        run: |
+          set -euo pipefail
+          COMMAND_ID=$(aws ssm send-command \
+            --region "$AWS_REGION" \
+            --cli-input-json file://ssm-request.json \
+            --query 'Command.CommandId' --output text)
+          rm -f ssm-request.json deploy-on-instance.sh
+          echo "command_id=${COMMAND_ID}" >> "$GITHUB_OUTPUT"
+          echo "SSM 커맨드 전송: ${COMMAND_ID}"
+
+          # The invocation record is not queryable for the first second or two.
+          sleep 10
+
+          DEADLINE=$(( $(date +%s) + POLL_TIMEOUT_SECONDS ))
+          STATUS="Pending"
+          while :; do
+            if aws ssm wait command-executed \
+                 --region "$AWS_REGION" \
+                 --command-id "$COMMAND_ID" \
+                 --instance-id "$INSTANCE_ID" 2>/dev/null; then
+              STATUS="Success"
+              break
+            fi
+            STATUS=$(aws ssm get-command-invocation \
+                       --region "$AWS_REGION" \
+                       --command-id "$COMMAND_ID" \
+                       --instance-id "$INSTANCE_ID" \
+                       --query 'Status' --output text 2>/dev/null || echo "Pending")
+            case "$STATUS" in
+              Pending|InProgress|Delayed)
+                if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+                  echo "::error::${POLL_TIMEOUT_SECONDS}초 안에 끝나지 않았습니다 (마지막 상태 ${STATUS}). 커맨드 ${COMMAND_ID} 는 인스턴스에서 계속 돌고 있을 수 있습니다. AWS 콘솔 → Systems Manager → Run Command 에서 확인하세요."
+                  exit 1
+                fi
+                echo "진행 중 (${STATUS}) — 대기"
+                ;;
+              *)
+                break
+                ;;
+            esac
+          done
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+          echo "최종 상태: ${STATUS}"
+
+      # Always runs: a failed deploy is exactly when the instance-side log is
+      # needed. StandardOutputContent is truncated by the API at 24,000
+      # characters, so the tail of a long Gradle build may be missing here.
+      - name: Show instance output
+        if: always() && steps.run.outputs.command_id != ''
+        env:
+          INSTANCE_ID: ${{ steps.target.outputs.instance_id }}
+          COMMAND_ID: ${{ steps.run.outputs.command_id }}
+        run: |
+          set -euo pipefail
+          aws ssm get-command-invocation \
+            --region "$AWS_REGION" \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query 'StandardOutputContent' --output text || true
+          echo "----- stderr -----"
+          aws ssm get-command-invocation \
+            --region "$AWS_REGION" \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query 'StandardErrorContent' --output text || true
+
+      - name: Report result
+        if: always() && steps.run.outputs.command_id != ''
+        env:
+          INSTANCE_ID: ${{ steps.target.outputs.instance_id }}
+          COMMAND_ID: ${{ steps.run.outputs.command_id }}
+          GIT_REF: ${{ steps.target.outputs.git_ref }}
+        run: |
+          set -euo pipefail
+          STATUS=$(aws ssm get-command-invocation \
+                     --region "$AWS_REGION" \
+                     --command-id "$COMMAND_ID" \
+                     --instance-id "$INSTANCE_ID" \
+                     --query 'Status' --output text 2>/dev/null || echo "Unknown")
+          CODE=$(aws ssm get-command-invocation \
+                   --region "$AWS_REGION" \
+                   --command-id "$COMMAND_ID" \
+                   --instance-id "$INSTANCE_ID" \
+                   --query 'ResponseCode' --output text 2>/dev/null || echo "-1")
+          {
+            echo "### 백엔드 EC2 배포 ${STATUS}"
+            echo ""
+            echo "- 인스턴스: \`${INSTANCE_ID}\`"
+            echo "- SSM 커맨드: \`${COMMAND_ID}\`"
+            echo "- 종료 코드: \`${CODE}\`"
+            echo "- 배포 ref: \`${GIT_REF}\`"
+            echo "- 실행 커밋: \`${GITHUB_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::SSM 커맨드가 ${STATUS} 로 끝났습니다 (종료 코드 ${CODE}). 위 'Show instance output' 단계의 출력을 먼저 보세요. docs/deploy.md 의 '실패 시 확인 지점' 참고."
+            exit 1
+          fi
+          echo "배포 완료: ${INSTANCE_ID}"
