@@ -4,6 +4,7 @@ import com.awesome.backend.inbound.service.MeasurementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,5 +29,16 @@ public class MeasurementController {
     @PostMapping
     public MeasurementResponse measure(@Valid @RequestBody MeasurementRequest request) {
         return measurementService.measure(request.productId());
+    }
+
+    @Operation(summary = "측정 확정",
+            description = "APPROVE 는 추론값을 그대로 확정하며 게이트 통과 세션에만 쓸 수 있다. "
+                    + "MANUAL 은 요청 치수로 확정하고 MEASURE_FAILED 세션에도 허용된다. "
+                    + "무게는 요청값이 세션 저울값보다 우선하고, 둘 다 없으면 400 이다. "
+                    + "재고는 변동하지 않는다 (D-09).")
+    @PostMapping("/{sessionId}/confirm")
+    public ConfirmResponse confirm(@PathVariable Long sessionId,
+                                   @Valid @RequestBody ConfirmRequest request) {
+        return measurementService.confirm(sessionId, request);
     }
 }

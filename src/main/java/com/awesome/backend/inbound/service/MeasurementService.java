@@ -2,7 +2,10 @@ package com.awesome.backend.inbound.service;
 
 import com.awesome.backend.common.error.ApiException;
 import com.awesome.backend.common.error.ErrorCode;
+import com.awesome.backend.inbound.controller.ConfirmRequest;
+import com.awesome.backend.inbound.controller.ConfirmResponse;
 import com.awesome.backend.inbound.controller.MeasurementResponse;
+import com.awesome.backend.inbound.entity.ConfirmMethod;
 import com.awesome.backend.inbound.entity.MeasurementSession;
 import com.awesome.backend.inbound.entity.MeasurementStatus;
 import com.awesome.backend.inbound.entity.Product;
@@ -90,6 +93,89 @@ public class MeasurementService {
         attachImages(session);
 
         return MeasurementResponse.inferred(session, handlingDefaults(product));
+    }
+
+    /**
+     * 측정 확정 (1-4). 승인(APPROVE)은 세션의 추론값을, 수기(MANUAL)는 요청 치수를 확정한다.
+     *
+     * <p>재고는 변동하지 않는다 — 재고 증가는 1-5 stock-in 에서만 발생한다 (D-09).
+     */
+    @Transactional
+    public ConfirmResponse confirm(Long sessionId, ConfirmRequest request) {
+        MeasurementSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND,
+                        "측정 세션을 찾을 수 없습니다.", Map.of("sessionId", sessionId)));
+
+        // 확정·폐기된 세션은 다시 확정하지 않는다. 폐기(DISCARDED)도 같은 코드로 막는다 —
+        // 재촬영으로 밀려난 세션을 뒤늦게 확정하면 최신 촬영 결과를 덮어쓴다.
+        if (!session.isOpen()) {
+            throw new ApiException(ErrorCode.SESSION_ALREADY_CONFIRMED,
+                    "이미 확정되었거나 폐기된 세션입니다.",
+                    Map.of("sessionId", sessionId, "status", session.getStatus().name()));
+        }
+
+        BigDecimal weightKg = resolveWeight(session, request);
+        Dims dims = resolveDims(session, request);
+
+        // 축 규약(D-18) 정렬은 세션 확정 안에서 한 번만 한다. product 는 그 결과를 받아 쓴다.
+        ConfirmMethod method = request.method();
+        session.confirm(method, dims.widthCm(), dims.lengthCm(), dims.heightCm(), weightKg);
+
+        ConfirmRequest.Handling handling = request.handling();
+        Product product = session.getProduct();
+        product.confirmMeasurement(
+                session.getConfirmedWidthCm(), session.getConfirmedLengthCm(),
+                session.getConfirmedHeightCm(), session.getConfirmedWeightKg(),
+                dimMethodOf(method),
+                handling.refrigerate(), handling.fragile(), handling.irregular());
+
+        return ConfirmResponse.from(product);
+    }
+
+    /** 요청 weightKg 가 세션 저울값보다 우선한다. 둘 다 없으면 무게 미확정이라 확정할 수 없다. */
+    private BigDecimal resolveWeight(MeasurementSession session, ConfirmRequest request) {
+        BigDecimal weightKg = request.weightKg() != null
+                ? request.weightKg()
+                : session.getMeasuredWeightKg();
+
+        if (weightKg == null) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                    "세션에 저울값이 없어 weightKg 가 필요합니다.",
+                    Map.of("sessionId", session.getId()));
+        }
+        return weightKg;
+    }
+
+    /**
+     * APPROVE 는 세션의 추론값을, MANUAL 은 요청 치수를 쓴다.
+     * 게이트는 치수 추론에만 적용되므로 MANUAL 에는 걸지 않는다 — MEASURE_FAILED 세션도 수기 확정은 된다.
+     */
+    private Dims resolveDims(MeasurementSession session, ConfirmRequest request) {
+        if (request.method() == ConfirmMethod.MANUAL) {
+            ConfirmRequest.Dimensions dims = request.dims();
+            if (dims == null) {
+                throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                        "수기 확정에는 dims 가 필요합니다.", Map.of("method", "MANUAL"));
+            }
+            return new Dims(dims.widthCm(), dims.lengthCm(), dims.heightCm());
+        }
+
+        if (!session.isGatePassed()) {
+            throw new ApiException(ErrorCode.GATE_NOT_PASSED,
+                    "신뢰도 게이트 미통과 세션은 승인할 수 없습니다.",
+                    Map.of("reasons", session.getGateFailReasons()));
+        }
+
+        return new Dims(session.getInferredWidthCm(), session.getInferredLengthCm(),
+                session.getInferredHeightCm());
+    }
+
+    /** 1-4 의 method 와 product.dim_method 는 이름이 다르다 — APPROVE 는 추론값 승인이라 INFERRED 다. */
+    private String dimMethodOf(ConfirmMethod method) {
+        return method == ConfirmMethod.MANUAL ? Product.DIM_METHOD_MANUAL : Product.DIM_METHOD_INFERRED;
+    }
+
+    private record Dims(BigDecimal widthCm, BigDecimal lengthCm, BigDecimal heightCm) {
     }
 
     /** 재촬영: 이전 세션은 폐기한다. 확정된 세션은 건드리지 않는다. */
