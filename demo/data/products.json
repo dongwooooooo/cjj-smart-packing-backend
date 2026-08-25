@@ -1,16 +1,20 @@
 [
   {
-    "gtin": "8801234500011", "name": "델가 오렌지주스 1L",
-    "mediumCategoryCode": "C1010", "pool": "OUTBOUND",
+    "gtin": "8801234500011",
+    "name": "델가 오렌지주스 1L",
+    "mediumCategoryCode": "C1010",
+    "pool": "OUTBOUND",
     "dims": { "widthCm": 7.0, "lengthCm": 7.0, "heightCm": 23.0 },
-    "weightKg": 1.080,
+    "weightKg": 1.08,
     "flags": { "refrigerate": true, "fragile": true, "irregular": false },
-    "stockQty": 6,
+    "stockQty": 50,
     "images": []
   },
   {
-    "gtin": "8801234500042", "name": "허니버터칩 60g",
-    "mediumCategoryCode": "C2010", "pool": "OUTBOUND",
+    "gtin": "8801234500042",
+    "name": "허니버터칩 60g",
+    "mediumCategoryCode": "C2010",
+    "pool": "OUTBOUND",
     "dims": { "widthCm": 20.0, "lengthCm": 13.0, "heightCm": 5.0 },
     "weightKg": 0.068,
     "flags": { "refrigerate": false, "fragile": false, "irregular": false },
@@ -18,17 +22,21 @@
     "images": []
   },
   {
-    "gtin": "8801234500066", "name": "매운라면 5입",
-    "mediumCategoryCode": "C2020", "pool": "OUTBOUND",
+    "gtin": "8801234500066",
+    "name": "매운라면 5입",
+    "mediumCategoryCode": "C2020",
+    "pool": "OUTBOUND",
     "dims": { "widthCm": 22.0, "lengthCm": 18.0, "heightCm": 11.0 },
-    "weightKg": 0.600,
+    "weightKg": 0.6,
     "flags": { "refrigerate": false, "fragile": false, "irregular": false },
     "stockQty": 50,
     "images": []
   },
   {
-    "gtin": "8801234500028", "name": "델가 포도주스 1L",
-    "mediumCategoryCode": "C1010", "pool": "INBOUND",
+    "gtin": "8801234500028",
+    "name": "델가 포도주스 1L",
+    "mediumCategoryCode": "C1010",
+    "pool": "INBOUND",
     "dims": { "widthCm": 7.0, "lengthCm": 7.0, "heightCm": 23.0 },
     "weightKg": 1.075,
     "flags": { "refrigerate": true, "fragile": true, "irregular": false },
@@ -40,10 +48,12 @@
     ]
   },
   {
-    "gtin": "8801234500035", "name": "스파클 사이다 500ml",
-    "mediumCategoryCode": "C1020", "pool": "INBOUND",
+    "gtin": "8801234500035",
+    "name": "스파클 사이다 500ml",
+    "mediumCategoryCode": "C1020",
+    "pool": "INBOUND",
     "dims": { "widthCm": 6.5, "lengthCm": 6.5, "heightCm": 20.0 },
-    "weightKg": 0.540,
+    "weightKg": 0.54,
     "flags": { "refrigerate": false, "fragile": true, "irregular": false },
     "stockQty": 0,
     "images": [
@@ -53,8 +63,10 @@
     ]
   },
   {
-    "gtin": "8801234500059", "name": "초코파이 12입",
-    "mediumCategoryCode": "C2010", "pool": "INBOUND",
+    "gtin": "8801234500059",
+    "name": "초코파이 12입",
+    "mediumCategoryCode": "C2010",
+    "pool": "INBOUND",
     "dims": { "widthCm": 24.0, "lengthCm": 17.0, "heightCm": 6.0 },
     "weightKg": 0.468,
     "flags": { "refrigerate": false, "fragile": false, "irregular": false },

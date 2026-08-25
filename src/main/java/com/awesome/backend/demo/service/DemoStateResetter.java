@@ -1,53 +1,45 @@
 package com.awesome.backend.demo.service;
 
-import com.awesome.backend.inbound.entity.MeasurementSession;
-import com.awesome.backend.inbound.repository.MeasurementSessionRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 이전 런 종결 (명세 §4-1). 아무것도 지우지 않는다 — 끝난 것으로 표시만 한다.
+ * 시연 잔여물 삭제 (명세 §4-1). 지난 시연에서 만들어진 행을 전부 지우고,
+ * 기준정보는 처음 상태로 되돌린다.
  *
- * <p>취소 상태가 스키마에 없어서 진행 중이던 주문·배송단위는 LOADED로 닫는다.
- * 시연 범위 밖의 종료 상태를 빌려 쓰는 것이고, 지난 런의 행이 새 런의 화면에
- * 섞여 보이지 않게 하는 게 목적이다.
+ * <p>기준정보(분류·지역·라인·박스·토트 행)는 지우지 않는다. 지우면 seed를 다시 넣어야
+ * 하고, 배송단위가 참조하는 라인·박스가 사라진다. 대신 상태만 처음으로 돌린다.
+ *
+ * <p>삭제 순서는 참조를 거는 쪽부터다 — 품목이 배송단위를, 배송단위가 주문을,
+ * 이미지가 측정 세션을 참조한다. 순서를 뒤집으면 외래키에 걸린다.
  */
 @Component
 public class DemoStateResetter {
 
     private final JdbcTemplate jdbcTemplate;
-    private final MeasurementSessionRepository measurementSessionRepository;
 
-    public DemoStateResetter(JdbcTemplate jdbcTemplate,
-                             MeasurementSessionRepository measurementSessionRepository) {
+    public DemoStateResetter(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
-        this.measurementSessionRepository = measurementSessionRepository;
     }
 
     @Transactional
-    public void closePreviousRun() {
-        jdbcTemplate.update("""
-                update orders set status = 'LOADED'
-                 where id in (select order_id from shipment
-                               where status in ('PLANNED', 'TOTE_ASSIGNED', 'PACKING'))
-                """);
-        jdbcTemplate.update("""
-                update shipment set status = 'LOADED'
-                 where status in ('PLANNED', 'TOTE_ASSIGNED', 'PACKING')
-                """);
-        jdbcTemplate.update("update tote_assignment set released_at = now() where released_at is null");
+    public void clearDemoData() {
+        jdbcTemplate.update("delete from tote_assignment");
+        jdbcTemplate.update("delete from shipment_item");
+        jdbcTemplate.update("delete from shipment");
+        jdbcTemplate.update("delete from order_item");
+        jdbcTemplate.update("delete from orders");
+        jdbcTemplate.update("delete from measurement_image");
+        jdbcTemplate.update("delete from measurement_session");
+        jdbcTemplate.update("delete from inventory_tx");
+        jdbcTemplate.update("delete from demo_order_queue");
+    }
+
+    /** 토트는 전부 유휴, 박스 재고는 seed 수준으로 (명세 §4-2). */
+    @Transactional
+    public void restoreEquipment(int boxStockQty) {
         jdbcTemplate.update("update tote set status = 'IDLE' where status <> 'IDLE'");
-
-        // 폐기 전이는 P1 엔티티가 이미 갖고 있다 — 여기서 상태 문자열을 다시 정의하지 않는다
-        measurementSessionRepository.findAll().stream()
-                .filter(MeasurementSession::isOpen)
-                .forEach(MeasurementSession::discard);
-    }
-
-    /** 박스 재고 복원 (명세 §4-2). 시연 중 줄어든 값을 seed 수준으로 되돌린다. */
-    @Transactional
-    public int restoreBoxStock(int stockQty) {
-        return jdbcTemplate.update("update box_type set stock_qty = ?", stockQty);
+        jdbcTemplate.update("update box_type set stock_qty = ?", boxStockQty);
     }
 }

@@ -61,8 +61,8 @@ public class DemoDataLoader {
             }
             for (JsonNode order : orders) {
                 String receiptNo = text(order, "receiptNo", ORDERS_FILE, "배치 " + batchId);
-                // 런 시작 때 주문번호 앞에 런 아이디만 붙이므로, 파일 안에서 이미 겹치면
-                // 런 안에서도 겹친다 — 배치가 달라도 마찬가지다
+                // 주문번호는 파일 값을 그대로 쓴다. 파일 안에서 겹치면 접수 때 배치 전체가
+                // 거부된다 — 배치가 달라도 마찬가지다
                 if (!seenReceiptNos.add(receiptNo)) {
                     throw new DemoDataException(ORDERS_FILE
                             + ": 같은 주문번호가 두 번 들어 있습니다 — " + receiptNo

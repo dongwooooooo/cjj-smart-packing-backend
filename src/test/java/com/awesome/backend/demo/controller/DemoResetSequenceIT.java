@@ -28,21 +28,21 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * 런을 이어서 두 번 돌릴 때와, 도중에 실패할 때 (명세 §4).
+ * 리셋을 이어서 두 번 누를 때와, 도중에 실패할 때 (명세 §4).
  *
- * <p>이 클래스는 테스트 트랜잭션을 쓰지 않는다. 런 시작이 자기 트랜잭션을 커밋·롤백하는
+ * <p>이 클래스는 테스트 트랜잭션을 쓰지 않는다. 리셋이 자기 트랜잭션을 커밋·롤백하는
  * 걸 봐야 하는데, 테스트가 트랜잭션을 들고 있으면 서비스가 거기 참여해 실제로
  * 되돌아가지 않는다. 남는 데이터는 매 테스트 뒤에 직접 지운다.
  */
 @SpringBootTest
 @Testcontainers
-class DemoRunSequenceIT {
+class DemoResetSequenceIT {
 
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18.6");
 
-    private static final String RUNS = "/api/v1/admin/demo/runs";
+    private static final String RESET = "/api/v1/admin/demo/reset";
     private static final String IMPORT = "/api/v1/admin/orders/import";
 
     @Autowired WebApplicationContext context;
@@ -80,85 +80,97 @@ class DemoRunSequenceIT {
                 """);
     }
 
-    private String startRun() throws Exception {
-        String body = mvc.perform(post(RUNS)).andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        return body.replaceAll(".*\"runId\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+    private void reset() throws Exception {
+        mvc.perform(post(RESET)).andExpect(status().isOk());
     }
 
-    @Test
-    void 두_번째_런이_첫_런의_진행분을_종결한다() throws Exception {
-        String first = startRun();
-        String batch = queueRepository.findFirstByRunIdAndReleasedAtIsNullOrderBySeqAsc(first)
+    private void importFirstBatch() throws Exception {
+        String batch = queueRepository.findFirstByReleasedAtIsNullOrderBySeqAsc()
                 .orElseThrow().batchJson();
         mvc.perform(post(IMPORT).contentType(MediaType.APPLICATION_JSON).content(batch))
                 .andExpect(status().isOk());
-
-        // 첫 런의 배치가 배송단위·토트를 잡은 상태
-        assertThat(count("select count(*) from shipment where status = 'TOTE_ASSIGNED'")).isPositive();
-
-        startRun();
-
-        assertThat(count("select count(*) from shipment where status = 'TOTE_ASSIGNED'")).isZero();
-        assertThat(count("select count(*) from shipment where status <> 'LOADED'")).isZero();
-        assertThat(count("select count(*) from orders where status <> 'LOADED'")).isZero();
-        assertThat(count("select count(*) from tote where status <> 'IDLE'")).isZero();
-        assertThat(count("select count(*) from tote_assignment where released_at is null")).isZero();
-        // 지운 게 아니라 종결만 했다
-        assertThat(orderRepository.count()).isPositive();
     }
 
     @Test
-    void 파일이_잘못됐으면_상태를_건드리기_전에_멈춘다() throws Exception {
-        String first = startRun();
-        int queuedBefore = queueRepository.countByRunIdAndReleasedAtIsNull(first);
-        int stockBefore = stockOf("8801234500042");
+    void 두_번째_리셋은_첫_시연의_잔여물을_지운다() throws Exception {
+        reset();
+        importFirstBatch();
+
+        assertThat(orderRepository.count()).isPositive();
+        assertThat(count("select count(*) from shipment")).isPositive();
+        assertThat(count("select count(*) from tote where status <> 'IDLE'")).isPositive();
+
+        reset();
+
+        assertThat(orderRepository.count()).isZero();
+        assertThat(count("select count(*) from shipment")).isZero();
+        assertThat(count("select count(*) from shipment_item")).isZero();
+        assertThat(count("select count(*) from order_item")).isZero();
+        assertThat(count("select count(*) from tote_assignment")).isZero();
+        assertThat(count("select count(*) from tote where status <> 'IDLE'")).isZero();
+        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(3);
+    }
+
+    @Test
+    void 리셋을_두_번_눌러도_같은_상태가_된다() throws Exception {
+        reset();
+        String first = statusSnapshot();
+
+        reset();
+
+        assertThat(statusSnapshot()).isEqualTo(first);
+    }
+
+    @Test
+    void 파일이_잘못됐으면_지우기_전에_멈춘다() throws Exception {
+        reset();
+        importFirstBatch();
+        long ordersBefore = orderRepository.count();
 
         doThrow(new DemoDataException("orders.json: 일부러 낸 오류"))
                 .when(loader).loadOrderBatches(any());
 
-        mvc.perform(post(RUNS)).andExpect(status().isInternalServerError());
+        mvc.perform(post(RESET)).andExpect(status().isInternalServerError());
 
-        assertThat(queueRepository.countByRunIdAndReleasedAtIsNull(first)).isEqualTo(queuedBefore);
-        assertThat(stockOf("8801234500042")).isEqualTo(stockBefore);
-        assertThat(count("select count(*) from demo_order_queue")).isEqualTo(queuedBefore);
+        assertThat(orderRepository.count()).isEqualTo(ordersBefore);
+        assertThat(queueRepository.count()).isEqualTo(3);
     }
 
     @Test
-    void 상태를_바꾼_뒤_실패하면_바꾼_것까지_되돌린다() throws Exception {
-        String first = startRun();
-        String batch = queueRepository.findFirstByRunIdAndReleasedAtIsNullOrderBySeqAsc(first)
-                .orElseThrow().batchJson();
-        mvc.perform(post(IMPORT).contentType(MediaType.APPLICATION_JSON).content(batch))
-                .andExpect(status().isOk());
-        jdbcTemplate.update("update box_type set stock_qty = 7");
+    void 지운_뒤_실패하면_지운_것까지_되돌린다() throws Exception {
+        reset();
+        importFirstBatch();
 
-        int assignedBefore = count("select count(*) from shipment where status = 'TOTE_ASSIGNED'");
+        long ordersBefore = orderRepository.count();
         int busyTotesBefore = count("select count(*) from tote where status <> 'IDLE'");
-        assertThat(assignedBefore).isPositive();
+        assertThat(ordersBefore).isPositive();
         assertThat(busyTotesBefore).isPositive();
 
-        // 이전 런 종결과 박스 재고 복원이 끝난 뒤에 터지는 지점
+        // 삭제와 장비 복원이 끝난 뒤에 터지는 지점
         doThrow(new IllegalStateException("일부러 낸 오류"))
                 .when(provisioner).provision(any());
 
-        mvc.perform(post(RUNS)).andExpect(status().isInternalServerError());
+        mvc.perform(post(RESET)).andExpect(status().isInternalServerError());
 
-        assertThat(count("select count(*) from shipment where status = 'TOTE_ASSIGNED'"))
-                .isEqualTo(assignedBefore);
+        assertThat(orderRepository.count()).isEqualTo(ordersBefore);
         assertThat(count("select count(*) from tote where status <> 'IDLE'"))
                 .isEqualTo(busyTotesBefore);
-        assertThat(count("select count(*) from tote_assignment where released_at is null"))
-                .isEqualTo(busyTotesBefore);
-        assertThat(count("select count(*) from box_type where stock_qty = 7")).isPositive();
+    }
+
+    /** 상태를 비교 가능한 문자열로 — 두 번 리셋한 결과가 같은지 보는 용도. */
+    private String statusSnapshot() {
+        return jdbcTemplate.queryForObject("""
+                select (select count(*) from orders) || '/' ||
+                       (select count(*) from shipment) || '/' ||
+                       (select count(*) from demo_order_queue where released_at is null) || '/' ||
+                       (select count(*) from tote where status = 'IDLE') || '/' ||
+                       (select count(*) from inventory_tx) || '/' ||
+                       (select coalesce(sum(stock_qty), 0) from product) || '/' ||
+                       (select coalesce(sum(stock_qty), 0) from box_type)
+                """, String.class);
     }
 
     private int count(String sql) {
         return jdbcTemplate.queryForObject(sql, Integer.class);
-    }
-
-    private int stockOf(String gtin) {
-        return jdbcTemplate.queryForObject(
-                "select stock_qty from product where gtin = ?", Integer.class, gtin);
     }
 }

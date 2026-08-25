@@ -64,7 +64,8 @@ public class DemoProductProvisioner {
 
     /**
      * 입고 풀은 치수를 비우고 미확정으로, 출고 풀은 파일의 치수를 확정으로 넣는다.
-     * 재고(stock_qty)는 건드리지 않는다 — 원장을 거치는 경로로 따로 맞춘다.
+     * 재고는 0으로 되돌린다 — 리셋이 원장을 비웠으므로 캐시도 같이 0에서 시작해야
+     * 원장 합계와 어긋나지 않는다. 목표 수량은 뒤에서 원장을 거쳐 채운다.
      */
     private void upsertProduct(DemoProductSpec spec) {
         boolean outbound = spec.pool() == DemoProduct.Pool.OUTBOUND;
@@ -86,6 +87,7 @@ public class DemoProductProvisioner {
                        is_refrigerate = excluded.is_refrigerate,
                        is_fragile = excluded.is_fragile,
                        is_irregular = excluded.is_irregular,
+                       stock_qty = 0,
                        updated_at = now()
                 """,
                 spec.gtin(), spec.name(), spec.mediumCategoryCode(), Product.PLACEHOLDER_IMAGE_URL,
