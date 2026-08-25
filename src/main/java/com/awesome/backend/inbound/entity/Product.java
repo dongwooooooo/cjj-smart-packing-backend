@@ -27,6 +27,10 @@ public class Product {
     public static final String DIM_STATUS_NONE = "NONE";
     public static final String DIM_STATUS_CONFIRMED = "CONFIRMED";
 
+    /** 확정된 치수의 출처. 1-4 의 method(APPROVE/MANUAL)와 이름이 다르다 — APPROVE 는 추론값 승인이라 INFERRED 다. */
+    public static final String DIM_METHOD_INFERRED = "INFERRED";
+    public static final String DIM_METHOD_MANUAL = "MANUAL";
+
     // 스키마(V1 CHECK)에는 'MANUAL' 값이 남아 있지만 만드는 경로가 없다 — 유일한 생성처였던
     // 1-2 가 D-21 로 삭제됐다. ENUM 정리는 마이그레이션 수정 + 볼륨 재적재가 필요해 후속 과제.
     public static final String SOURCE_MASTER = "MASTER";
@@ -104,6 +108,28 @@ public class Product {
 
     public boolean hasConfirmedDimensions() {
         return DIM_STATUS_CONFIRMED.equals(dimStatus);
+    }
+
+    /**
+     * 측정 확정 결과를 기록한다 (1-4).
+     *
+     * <p>치수는 축 규약(D-18) 정렬이 끝난 값을 받는다 — 정렬은 세션 확정
+     * ({@code MeasurementSession#confirm})에서 한 번만 한다.
+     *
+     * <p>재고는 건드리지 않는다. 재고 증가는 수량 입고(1-5)가 유일한 경로다 (D-09).
+     */
+    public void confirmMeasurement(BigDecimal widthCm, BigDecimal lengthCm, BigDecimal heightCm,
+                                   BigDecimal weightKg, String dimMethod,
+                                   boolean refrigerate, boolean fragile, boolean irregular) {
+        this.widthCm = widthCm;
+        this.lengthCm = lengthCm;
+        this.heightCm = heightCm;
+        this.weightKg = weightKg;
+        this.dimMethod = dimMethod;
+        this.dimStatus = DIM_STATUS_CONFIRMED;
+        this.refrigerate = refrigerate;
+        this.fragile = fragile;
+        this.irregular = irregular;
     }
 
     public Long id() {

@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND),
+    SESSION_NOT_FOUND(HttpStatus.NOT_FOUND),
     GATE_NOT_PASSED(HttpStatus.CONFLICT),
     SESSION_ALREADY_CONFIRMED(HttpStatus.CONFLICT),
     TOTE_NOT_ASSIGNED(HttpStatus.NOT_FOUND),
