@@ -51,12 +51,23 @@ public class DemoDataLoader {
     public List<String> loadOrderBatches(Path dataDir) {
         JsonNode root = readArray(dataDir.resolve(ORDERS_FILE), ORDERS_FILE);
         List<String> batches = new ArrayList<>();
+        Set<String> seenReceiptNos = new LinkedHashSet<>();
         for (int i = 0; i < root.size(); i++) {
             JsonNode batch = root.get(i);
             String batchId = text(batch, "batchId", ORDERS_FILE, (i + 1) + "번째 배치");
             JsonNode orders = batch.path("orders");
             if (!orders.isArray() || orders.isEmpty()) {
                 throw new DemoDataException(ORDERS_FILE + ": 배치 " + batchId + "에 주문이 없습니다.");
+            }
+            for (JsonNode order : orders) {
+                String receiptNo = text(order, "receiptNo", ORDERS_FILE, "배치 " + batchId);
+                // 런 시작 때 주문번호 앞에 런 아이디만 붙이므로, 파일 안에서 이미 겹치면
+                // 런 안에서도 겹친다 — 배치가 달라도 마찬가지다
+                if (!seenReceiptNos.add(receiptNo)) {
+                    throw new DemoDataException(ORDERS_FILE
+                            + ": 같은 주문번호가 두 번 들어 있습니다 — " + receiptNo
+                            + " (배치 " + batchId + ")");
+                }
             }
             batches.add(batch.toString());
         }

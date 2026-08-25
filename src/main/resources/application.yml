@@ -28,6 +28,11 @@ packing:
   margin-cm: 3.0
   filler-thickness-cm: 1.0
 
+demo:
+  # 시연 데이터 위치. 상대 경로라 로컬 실행과 컨테이너가 같은 값을 쓴다
+  data-dir: ./demo/data
+  box-stock-qty: 100
+
 inference:
   api-url: ${INFERENCE_API_URL:}
   timeout-seconds: ${INFERENCE_TIMEOUT_SECONDS:8}

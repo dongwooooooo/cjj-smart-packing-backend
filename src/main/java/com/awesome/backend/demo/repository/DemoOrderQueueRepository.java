@@ -10,4 +10,6 @@ public interface DemoOrderQueueRepository extends JpaRepository<DemoOrderQueue, 
     Optional<DemoOrderQueue> findFirstByRunIdAndReleasedAtIsNullOrderBySeqAsc(String runId);
 
     int countByRunIdAndReleasedAtIsNull(String runId);
+
+    boolean existsByRunId(String runId);
 }

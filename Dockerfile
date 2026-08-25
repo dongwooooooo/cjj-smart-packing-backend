@@ -13,5 +13,7 @@ RUN ./gradlew bootJar --no-daemon
 FROM eclipse-temurin:25.0.3_9-jre
 WORKDIR /app
 COPY --from=build /app/build/libs/backend-0.0.1-SNAPSHOT.jar app.jar
+# 시연 데이터 — 서버가 demo.data-dir(기본 ./demo/data)로 읽는다
+COPY demo ./demo
 EXPOSE 8000
 ENTRYPOINT ["java", "-jar", "app.jar"]
