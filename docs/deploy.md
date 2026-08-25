@@ -1,6 +1,6 @@
 # EC2 자동 배포
 
-main에 머지되면 GitHub Actions가 EC2 인스턴스의 백엔드를 새 코드로 다시 띄운다. 워크플로 파일은 `.github/workflows/deploy-ec2.yml` 하나다.
+develop에 머지되면 GitHub Actions가 EC2 인스턴스의 백엔드를 새 코드로 다시 띄운다. 워크플로 파일은 `.github/workflows/deploy-ec2.yml` 하나다.
 
 ## 대상
 
@@ -20,7 +20,7 @@ SSH 키도 인바운드 포트도 쓰지 않는다. 러너가 GitHub OIDC로 AWS
 ### 잡 단계
 
 1. **AWS 위임** — `aws-actions/configure-aws-credentials@v6`가 OIDC로 `secrets.AWS_ROLE_ARN` 역할을 받는다.
-2. **대상 확정** — 인스턴스 ID와 배포할 git ref를 정하고 형식을 검사한다. push 이벤트면 ref는 그 실행을 만든 커밋 SHA다. 수동 실행이면 입력값(기본 `main`)이다.
+2. **대상 확정** — 인스턴스 ID와 배포할 git ref를 정하고 형식을 검사한다. push 이벤트면 ref는 그 실행을 만든 커밋 SHA다. 수동 실행이면 입력값(기본 `develop`)이다.
 3. **인스턴스 확인** — `ssm describe-instance-information`으로 대상이 `Online` 인지 본다. 인스턴스 정지, 인스턴스 프로파일 누락, 에이전트 미등록이 모두 여기서 같은 모습으로 잡힌다. 확인 없이 명령을 보내면 `InvalidInstanceId`만 돌아와 원인을 알 수 없다.
 4. **인스턴스 스크립트 작성** — 인스턴스에서 돌 bash 스크립트를 파일로 쓰고 `bash -n`으로 문법을 검사한다.
 5. **SSM 요청 조립** — 스크립트를 base64로 인코딩하고, 토큰·ref·저장소 이름을 `shlex.quote`로 감싸 명령 본문을 만든다. 2026-08-25 기준 요청 본문은 5,415바이트다.
@@ -72,7 +72,7 @@ ref는 `origin/<ref>` → `<ref>` → `git fetch origin <ref>` 순으로 해석�
 
 이 조직의 토큰은 `sub` 클레임에 소유자 ID·저장소 ID가 붙은 형식(`repo:cj-ai-sw@316033991/backend@1340552275:ref:...`)으로 발급된다. 이름만 쓴 패턴은 매칭에 실패해 `Not authorized to perform sts:AssumeRoleWithWebIdentity`가 나므로 두 형식을 모두 넣는다. 숫자는 토큰의 `repository_owner_id`·`repository_id` 클레임 값이다.
 
-`:*`는 이 저장소의 모든 브랜치·태그를 허용한다. main 머지에서만 쓰게 좁히려면 `repo:cj-ai-sw/backend:ref:refs/heads/main`으로 바꾼다. 그렇게 하면 다른 브랜치에서 수동 실행할 때 위임이 거부된다.
+`:*`는 이 저장소의 모든 브랜치·태그를 허용한다. develop 머지에서만 쓰게 좁히려면 `repo:cj-ai-sw/backend:ref:refs/heads/develop`으로 바꾼다. 그렇게 하면 다른 브랜치에서 수동 실행할 때 위임이 거부된다.
 
 권한 정책은 손대지 않는다. 대상 인스턴스가 `ai`와 같은 `i-0c7dac45358b3fafc`라서 `ssm:SendCommand`의 리소스 ARN과 `AWS-RunShellScript` 문서 ARN이 이미 들어 있다. 인스턴스를 따로 쓰게 되면 그때 `SsmSendCommand` 문에 인스턴스 ARN을 추가한다.
 
@@ -108,9 +108,9 @@ Variables 탭의 `EC2_INSTANCE_ID`는 선택이다. 등록하지 않으면 워�
 
 Actions 탭 → 왼쪽에서 `deploy-ec2` → 오른쪽 **Run workflow**.
 
-- `ref` 입력을 기본값 `main`으로 두면 main의 최신 커밋이 올라간다. 왼쪽에서 고른 브랜치와 무관하다 — 실행할 워크플로 파일만 그 브랜치에서 읽는다.
+- `ref` 입력을 기본값 `develop`으로 두면 develop의 최신 커밋이 올라간다. 왼쪽에서 고른 브랜치와 무관하다 — 실행할 워크플로 파일만 그 브랜치에서 읽는다.
 - 특정 브랜치·태그·커밋을 올리려면 `ref`에 그 값을 넣는다. 이전 커밋으로 되돌릴 때 쓰는 방법이다.
-- main이 아닌 ref를 올리려면 IAM 신뢰 정책의 `sub` 조건이 `repo:cj-ai-sw/backend:*`여야 한다.
+- develop이 아닌 ref를 올리려면 IAM 신뢰 정책의 `sub` 조건이 `repo:cj-ai-sw/backend:*`여야 한다.
 
 인스턴스에 직접 접속해 코드를 고치지 않는다. 고쳐도 다음 배포의 `reset --hard`가 덮어쓰고, 무엇이 올라가 있는지 레포만 봐서는 알 수 없게 된다.
 
@@ -156,7 +156,7 @@ SSM 에이전트가 만드는 스크립트 파일(`/var/lib/amazon/ssm/` 아래)
 
 ## 아직 안 한 것
 
-- **PR 검사** — main 대상 PR에서 빌드·테스트를 돌리는 워크플로가 없다. 지금은 머지된 뒤 인스턴스에서 처음 빌드된다. 빌드가 깨진 커밋이 main에 들어가면 배포 잡에서 발견된다.
+- **PR 검사** — develop 대상 PR에서 빌드·테스트를 돌리는 워크플로가 없다. 지금은 머지된 뒤 인스턴스에서 처음 빌드된다. 빌드가 깨진 커밋이 develop에 들어가면 배포 잡에서 발견된다.
 - **무중단 배포** — `compose up -d --build`는 빌드가 끝난 뒤 컨테이너를 갈아 끼운다. 그동안 짧게 끊긴다. 인스턴스 한 대에 컨테이너 한 벌이라 롤링 교체할 대상이 없다.
 - **자동 롤백** — 배포가 실패하면 인스턴스는 새 코드를 받은 상태로 남는다. 되돌리려면 이전 커밋 SHA를 `ref`에 넣어 수동 실행한다.
 - **백업 디렉터리 정리** — `~/backend.bak.*`는 자동으로 지워지지 않는다. git 저장소가 아닌 상태에서만 만들어지므로 정상 운영에서는 첫 배포 때 한 번 생긴다. 내용을 확인한 뒤 손으로 지운다.

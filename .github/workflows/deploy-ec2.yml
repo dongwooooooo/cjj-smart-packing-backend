@@ -14,14 +14,14 @@ name: deploy-ec2
 on:
   push:
     branches:
-      - main
+      - develop
   workflow_dispatch:
     inputs:
       ref:
-        description: '배포할 git ref (브랜치·태그·커밋 SHA). 비우면 main.'
+        description: '배포할 git ref (브랜치·태그·커밋 SHA). 비우면 develop.'
         required: false
         type: string
-        default: 'main'
+        default: 'develop'
 
 permissions:
   contents: read
