@@ -116,13 +116,15 @@ demo_order_queue(id PK, seq, batch_json JSONB, released_at NULL)
 부분 성공(일부 주문만 거부되고 나머지는 접수)은 접수 계약과 테스트에 그대로 있다.
 시연 화면으로 다루지 않을 뿐이다.
 
-## 6. P1 접점 계약 [협의 필요]
+## 6. P1 접점 계약 [확정 — 2026-08-25, D-24]
 
 | 항목 | P3 제공 | P1 사용 |
 | --- | --- | --- |
-| 이미지 | `demo/data/images/{gtin}/cam{n}.jpg` + `demo_product.image_dir` | 촬영(1-3) 시 모델 서버 호출 입력, 응답의 images URL |
-| 정답 치수 | `demo_product.gt_*` | mock 추론의 기준값 (설정값 대신) |
+| 이미지 | `demo/data/images/{gtin}/cam{n}.jpg` + `demo_product.image_dir` | `MeasurementImageSource`가 읽어 Lambda 추론 입력으로 보낸다. 응답 `images[].url`은 `/files/m/{gtin}/cam{n}.jpg`이며 같은 디렉토리를 정적 서빙한다. 행이 없거나 파일이 빠지면 Lambda 모드에서는 `MEASURE_FAILED(NO_IMAGES)` |
+| 정답 치수 | `demo_product.gt_*` | mock 추론의 기준값. 행이 없으면 설정값(`inference.mock.base-*`) |
 | 무게 | `product.weight_kg` (기존 D-10 그대로) | 변경 없음 |
+
+이미지 파일은 512px 리사이즈본이면 그대로 보낸다 — 모델 입력이 288×512라 축소가 필요 없고, 3장 합계가 Lambda 동기 호출 한도 6MB에 한참 못 미친다.
 
 ## 7. 작업 단위
 

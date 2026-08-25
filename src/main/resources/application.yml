@@ -34,7 +34,11 @@ demo:
   box-stock-qty: 100
 
 inference:
-  api-url: ${INFERENCE_API_URL:}
+  # Lambda 함수 이름(별칭 포함, 예: logistics-dimension-api:live). 비우면 mock (D-04, D-24)
+  lambda-function: ${INFERENCE_LAMBDA_FUNCTION:}
+  # 함수가 검사하는 X-API-Key. IAM 호출 권한과 별개로 함수 쪽에서 요구한다
+  api-key: ${INFERENCE_API_KEY:}
+  region: ${INFERENCE_AWS_REGION:ap-northeast-2}
   timeout-seconds: ${INFERENCE_TIMEOUT_SECONDS:8}
 
   # 신뢰도 게이트 (02 §1-3). 임계값은 아직 명세에 확정된 숫자가 없어 잠정값이다 —

@@ -16,7 +16,7 @@ class MeasurementGateTest {
     private static final BigDecimal MAX_DIMENSION_CM = new BigDecimal("100.0");
 
     private final MeasurementGate gate = new MeasurementGate(new InferenceProperties(
-            null, 8,
+            null, null, null, 8,
             new InferenceProperties.Gate(MIN_CONFIDENCE, MAX_ASPECT_RATIO, MAX_DIMENSION_CM),
             null));
 
@@ -41,9 +41,11 @@ class MeasurementGateTest {
     }
 
     @Test
-    void 신뢰도가_없으면_LOW_CONFIDENCE() {
-        assertThat(gate.evaluate(cm("12.0"), cm("9.0"), cm("20.0"), null))
-                .containsExactly("LOW_CONFIDENCE");
+    void 신뢰도가_없으면_신뢰도_판정만_건너뛴다() {
+        // 현재 Lambda 모델은 confidence 를 주지 않는다 (D-24). 나머지 게이트는 그대로다.
+        assertThat(gate.evaluate(cm("12.0"), cm("9.0"), cm("20.0"), null)).isEmpty();
+        assertThat(gate.evaluate(cm("120.0"), cm("9.0"), cm("20.0"), null))
+                .containsExactlyInAnyOrder("ASPECT_RATIO", "OUT_OF_RANGE");
     }
 
     @Test

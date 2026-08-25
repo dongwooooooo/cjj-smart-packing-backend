@@ -2,10 +2,13 @@ package com.awesome.backend.inbound.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.awesome.backend.demo.entity.DemoProduct;
+import com.awesome.backend.demo.repository.DemoProductRepository;
 import com.awesome.backend.inbound.entity.MeasurementSession;
 import com.awesome.backend.inbound.entity.MeasurementStatus;
 import com.awesome.backend.inbound.entity.Product;
@@ -55,6 +58,7 @@ class MeasurementControllerIT {
     @Autowired WebApplicationContext context;
     @Autowired ProductRepository productRepository;
     @Autowired MeasurementSessionRepository sessionRepository;
+    @Autowired DemoProductRepository demoProductRepository;
     @PersistenceContext EntityManager em;
 
     private MockMvc mvc;
@@ -183,6 +187,25 @@ class MeasurementControllerIT {
                         "/files/m/%d-1.jpg".formatted(session.getId()),
                         "/files/m/%d-2.jpg".formatted(session.getId()),
                         "/files/m/%d-3.jpg".formatted(session.getId()));
+    }
+
+    @Test
+    void 데모_이미지가_있는_상품은_그_파일_URL이_실리고_정적으로_열린다() throws Exception {
+        // P3 데모 서브시스템이 demo/data/images/{gtin}/cam{n}.jpg 를 두고 demo_product.image_dir 로
+        // 가리킨다 (docs/demo-subsystem-spec.md §6). 리셋 API 대신 행만 직접 넣는다.
+        String gtin = "8801234500028";
+        Long productId = productRepository.findByGtin(gtin).map(Product::id).orElseThrow();
+        demoProductRepository.save(new DemoProduct(gtin, DemoProduct.Pool.INBOUND,
+                new java.math.BigDecimal("10.0"), new java.math.BigDecimal("8.0"),
+                new java.math.BigDecimal("5.0"), "images/" + gtin));
+
+        mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content(body(productId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.images[0].url").value("/files/m/" + gtin + "/cam1.jpg"))
+                .andExpect(jsonPath("$.images[2].url").value("/files/m/" + gtin + "/cam3.jpg"));
+
+        mvc.perform(get("/files/m/" + gtin + "/cam2.jpg"))
+                .andExpect(status().isOk());
     }
 
     @Test
