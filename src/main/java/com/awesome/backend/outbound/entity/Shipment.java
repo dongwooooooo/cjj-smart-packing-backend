@@ -85,6 +85,18 @@ public class Shipment {
         return lineId;
     }
 
+    public Long recommendedBoxId() {
+        return recommendedBoxId;
+    }
+
+    public Long finalBoxId() {
+        return finalBoxId;
+    }
+
+    public boolean fillerRecommended() {
+        return fillerRecommended;
+    }
+
     public void assignTote() {
         this.status = Status.TOTE_ASSIGNED;
     }
