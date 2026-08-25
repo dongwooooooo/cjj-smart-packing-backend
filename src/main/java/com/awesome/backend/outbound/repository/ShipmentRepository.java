@@ -18,4 +18,10 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
     List<Shipment> findByLineIdOrderByCreatedAtAscIdAsc(Long lineId);
 
     List<Shipment> findByLineIdAndStatusOrderByCreatedAtAscIdAsc(Long lineId, Shipment.Status status);
+
+    /**
+     * 3-8 포장 완료 응답의 line.packedCount — 그 라인에서 지금까지 PACKED로 전이된 배송단위 수.
+     * 같은 트랜잭션에서 방금 PACKED로 바꾼 shipment도 flush 후 반영돼 즉시 셈에 포함된다.
+     */
+    long countByLineIdAndStatus(Long lineId, Shipment.Status status);
 }

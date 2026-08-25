@@ -97,6 +97,10 @@ public class Shipment {
         return fillerRecommended;
     }
 
+    public LocalDateTime packedAt() {
+        return packedAt;
+    }
+
     public void assignTote() {
         this.status = Status.TOTE_ASSIGNED;
     }
@@ -123,5 +127,21 @@ public class Shipment {
      */
     public void overrideBox(Long boxTypeId) {
         this.finalBoxId = boxTypeId;
+    }
+
+    /**
+     * 포장 완료 처리 (3-8). PACKING 상태에서만 PACKED로 전이하고 packedAt을 채운다.
+     *
+     * <p>서비스(ShipmentCompleteService)에서 이미 같은 상태를 사전 검증하지만, 엔티티 자체의
+     * 불변식도 여기서 한 번 더 지킨다 — 호출 순서가 바뀌거나 다른 경로로 호출돼도 안전하도록.
+     * PACKING이 아니면 IllegalStateException을 던지고, 서비스가 이를 잡아 ApiException(INVALID_STATE)로
+     * 변환한다.
+     */
+    public void complete() {
+        if (status != Status.PACKING) {
+            throw new IllegalStateException("PACKING 상태에서만 포장 완료할 수 있습니다. 현재 상태: " + status);
+        }
+        this.status = Status.PACKED;
+        this.packedAt = LocalDateTime.now();
     }
 }
