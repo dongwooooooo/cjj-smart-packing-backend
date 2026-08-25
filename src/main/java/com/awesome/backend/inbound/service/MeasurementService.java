@@ -27,9 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MeasurementService {
 
-    /** 촬영함 고정 카메라 대수. measurement_image 의 camera_no CHECK 제약과 같은 값이다. */
-    private static final short CAMERA_COUNT = 3;
-
     /** 재촬영 시 정리 대상 — 아직 확정도 폐기도 안 된 세션. */
     private static final List<MeasurementStatus> OPEN_STATUSES =
             List.of(MeasurementStatus.INFERRED, MeasurementStatus.MEASURE_FAILED);
@@ -40,17 +37,20 @@ public class MeasurementService {
     private final ProductRepository productRepository;
     private final MeasurementSessionRepository sessionRepository;
     private final CategoryAttributeMapRepository categoryAttributeMapRepository;
+    private final MeasurementImageSource imageSource;
     private final InferenceClient inferenceClient;
     private final MeasurementGate gate;
 
     public MeasurementService(ProductRepository productRepository,
                               MeasurementSessionRepository sessionRepository,
                               CategoryAttributeMapRepository categoryAttributeMapRepository,
+                              MeasurementImageSource imageSource,
                               InferenceClient inferenceClient,
                               MeasurementGate gate) {
         this.productRepository = productRepository;
         this.sessionRepository = sessionRepository;
         this.categoryAttributeMapRepository = categoryAttributeMapRepository;
+        this.imageSource = imageSource;
         this.inferenceClient = inferenceClient;
         this.gate = gate;
     }
@@ -70,7 +70,10 @@ public class MeasurementService {
         // 추론과 별개 경로라 추론이 실패해도 이 값은 응답에 실린다.
         BigDecimal measuredWeightKg = product.weightKg();
 
-        InferenceResult result = inferenceClient.infer(product);
+        // 시연은 카메라 대신 데모 데이터셋 사진을 쓴다. 사진이 없으면 Lambda 추론은 실패하고
+        // mock 은 사진을 보지 않는다 — 어느 쪽이든 판단은 클라이언트가 한다.
+        List<CameraImage> images = imageSource.load(product);
+        InferenceResult result = inferenceClient.infer(product, images);
         if (result.failed()) {
             MeasurementSession session = sessionRepository.save(
                     MeasurementSession.failed(product, measuredWeightKg));
@@ -90,7 +93,7 @@ public class MeasurementService {
                 product, widthCm, lengthCm, heightCm, measuredWeightKg,
                 result.confidence(), gateFailReasons.isEmpty(), gateFailReasons));
 
-        attachImages(session);
+        attachImages(session, images);
 
         return MeasurementResponse.inferred(session, handlingDefaults(product));
     }
@@ -185,13 +188,17 @@ public class MeasurementService {
     }
 
     /**
-     * 카메라 3대분 이미지 경로를 붙인다.
+     * 카메라 3대분 이미지 경로를 붙인다. 1-6 제품 이미지 조회가 이 경로를 그대로 돌려준다.
      *
-     * <p>시연에는 카메라가 없어 실제 파일을 만들지 않고 경로 문자열만 기록한다 —
-     * 1-6 제품 이미지 조회가 이 경로를 그대로 돌려주고, 실물 촬영이 붙으면 저장 위치만 바뀐다.
+     * <p>추론에 쓴 사진이 있으면 그 조회 URL 을 기록한다. 없으면(mock 에 데모 이미지 없는 상품)
+     * 실제 파일 없이 경로 문자열만 남긴다 — 실물 촬영이 붙으면 저장 위치만 바뀐다.
      */
-    private void attachImages(MeasurementSession session) {
-        for (short cameraNo = 1; cameraNo <= CAMERA_COUNT; cameraNo++) {
+    private void attachImages(MeasurementSession session, List<CameraImage> images) {
+        if (!images.isEmpty()) {
+            images.forEach(image -> session.addImage(image.cameraNo(), image.url()));
+            return;
+        }
+        for (short cameraNo = 1; cameraNo <= MeasurementImageSource.CAMERA_COUNT; cameraNo++) {
             session.addImage(cameraNo, "/files/m/%d-%d.jpg".formatted(session.getId(), cameraNo));
         }
     }
