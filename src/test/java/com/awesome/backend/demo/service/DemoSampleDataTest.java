@@ -98,18 +98,29 @@ class DemoSampleDataTest {
     }
 
     @Test
-    void 합포장_주문은_한_배송단위로_나온다() {
+    void 배치마다_보여줄_장면이_하나씩_있다() {
+        // 1번 합포장, 2번 분할, 3번 완충재 — 투입할 때마다 화면이 달라진다
         assertThat(planFor("R-DEMO-0001")).hasSize(1);
-    }
-
-    @Test
-    void 분할_주문은_배송단위가_둘_이상으로_나뉜다() {
         assertThat(planFor("R-DEMO-0002")).hasSizeGreaterThan(1);
+        assertThat(planFor("R-DEMO-0003")).anyMatch(ShipmentPlan::fillerRecommended);
     }
 
     @Test
-    void 파손주의_주문은_완충재_권유가_켜진다() {
-        assertThat(planFor("R-DEMO-0003")).anyMatch(ShipmentPlan::fillerRecommended);
+    void 거부되는_주문은_들어_있지_않다() {
+        // 시연 시나리오에 실패 케이스가 없다. 배송지역은 기준정보에 있는 것만 쓴다
+        Map<String, DemoProductSpec> byGtin = productsByGtin();
+        for (JsonNode batch : batchNodes()) {
+            for (JsonNode order : batch.path("orders")) {
+                assertThat(order.path("regionCode").asText())
+                        .isIn("SEOUL", "GYEONGGI", "BUSAN");
+                for (JsonNode item : order.path("items")) {
+                    DemoProductSpec product = byGtin.get(item.path("gtin").asText());
+                    assertThat(item.path("qty").asInt())
+                            .as("주문 수량이 재고 안에 있어야 한다 — %s", product.gtin())
+                            .isLessThanOrEqualTo(product.stockQty());
+                }
+            }
+        }
     }
 
     private List<ShipmentPlan> planFor(String receiptNo) {

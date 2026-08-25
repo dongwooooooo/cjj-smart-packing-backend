@@ -41,29 +41,53 @@ products.json 항목:
 - 치수 축 규약(D-18) 적용: width ≥ length가 되도록 추출 시 정렬
 - ⚠️ 추출 스크립트는 데이터셋 머신에서 실행 — 이 명세는 산출 파일 형식만 정한다
 - **서버 접근 [확정]**: `demo.data-dir` 프로퍼티(기본 `./demo/data`)로 읽는다. Dockerfile이 `demo/`를 이미지에 COPY — 컨테이너 WORKDIR 기준 같은 상대 경로로 동작. 클래스패스 이동·볼륨 마운트는 기각 (경로 규칙이 갈라지거나 실행 방법이 늘어남)
-- orders.json의 `receiptNo`는 **파일 전체(모든 배치) 통틀어 유일** — 로더가 검증한다. 실제 주문번호는 런 시작 시 서버가 만든다 (§4-4)
+- orders.json의 `receiptNo`는 **파일 전체(모든 배치) 통틀어 유일** — 로더가 검증한다. 리셋이 이전 주문을 지우므로 파일 값을 그대로 주문번호로 쓴다 (§4-4)
 
 ## 3. 데모 테이블 (V3 마이그레이션) [제안]
 
 ```
 demo_product(gtin PK → product.gtin, pool, gt_width_cm, gt_length_cm, gt_height_cm, image_dir)
-demo_order_queue(id PK, run_id, seq, batch_json JSONB, released_at NULL)
+demo_order_queue(id PK, seq, batch_json JSONB, released_at NULL)
 ```
 
 - `demo_product`는 **P1 접점**: 촬영(1-3) 시 P1의 추론 클라이언트가 이 행을 찾으면 이미지 디렉토리를 모델 서버에 보내고, mock이면 정답치 기준으로 흔든다. P1 측 변경은 이 테이블을 읽는 것뿐 — 협의 필요 (§6)
 - 시연 전용 테이블임을 이름으로 드러낸다. 운영 스키마와 분리
 
-## 4. 새 런 시작 API [확정 — 2026-08-25, 삭제 없음]
+## 4. 리셋 API [확정 — 2026-08-25, 삭제 방식]
 
-`POST /api/v1/admin/demo/runs` → 런 ID 발급 (예: `R3`), 단일 트랜잭션. **아무것도 삭제하지 않는다.**
+`POST /api/v1/admin/demo/reset` → 시연 시작 상태를 만든다. 단일 트랜잭션, 멱등.
+몇 번을 눌러도 같은 상태가 된다.
 
-1. 이전 런 종결 — 활성 토트 할당 해제(released_at 기록), 토트 전부 IDLE. 진행 중(PLANNED·TOTE_ASSIGNED·PACKING) 배송단위와 그 주문은 LOADED로 종결(취소 상태가 없어 시연 범위 밖 종료 상태를 빌린다). 미확정 측정 세션은 DISCARDED
-2. 박스 재고 seed값으로 복원 (값 갱신)
-3. products.json 적재 — 마스터·상품 **upsert**. INBOUND: dim_status=NONE·치수 NULL·재고 0·demo_product 갱신 / OUTBOUND: 치수 CONFIRMED·재고를 목표값으로 맞추는 원장 ADJUST 기록
-4. orders.json → demo_order_queue 적재 (run_id, seq=배치 순번). **주문번호 = `{runId}-{파일 receiptNo}`** (예: `R3-DEMO-0001`) — 런마다 유일하고 파일의 어느 주문인지 추적 가능. 치환은 큐 적재 시점에 batch_json에 반영
-5. 응답: runId, 풀별 상품 수, 대기 배치 수, 토트·박스 상태 요약
+처음에는 아무것도 지우지 않고 런을 쌓는 방식이었으나, 시연에서 필요한 것은 "리허설을
+반복해도 매번 같은 화면에서 시작하는 것"이라 삭제 방식으로 바꿨다. 런 ID 개념도 함께
+없앴다 — 리셋이 대기열을 비우므로 주문번호는 파일 값 그대로 쓴다.
 
-멱등: 연속 호출은 새 런을 하나 더 만들 뿐, 이전 런 데이터는 이력으로 남는다.
+1. 시연 잔여물 삭제 — 토트 할당, 배송단위·품목, 주문·항목, 측정 세션·이미지, 재고 원장,
+   대기열. 삭제 순서는 참조를 거는 쪽부터다(품목→배송단위→주문, 이미지→세션)
+2. 기준정보 복원 — 분류·지역·라인·박스·토트 **행은 지우지 않는다**. 토트 상태 IDLE,
+   박스 재고 seed값으로 되돌린다
+3. products.json 적재 — 마스터·상품 upsert. INBOUND: dim_status=NONE·치수 NULL·재고 0·
+   demo_product 갱신 / OUTBOUND: 치수 CONFIRMED·재고를 목표값으로 맞추는 원장 ADJUST.
+   재고 캐시는 upsert에서 0으로 되돌린 뒤 원장을 거쳐 채운다 — 원장을 비웠으므로 캐시도
+   같이 0에서 시작해야 합계가 어긋나지 않는다
+4. orders.json → demo_order_queue 적재 (seq=배치 순번). 주문번호는 파일 값 그대로
+5. 응답: 구조 필드(풀별 상품 수, 대기 배치 수, 토트·박스) + `summary` — 여러 줄 텍스트
+
+파일은 지우기 전에 읽는다. 잘못된 파일이면 아무것도 지우지 않고 멈춘다.
+
+### 4-1. 상태 조회
+
+`GET /api/v1/admin/demo/status` → 지금 시연이 어디까지 왔는지. 리셋 직후든 시연 중이든
+같은 눈으로 본다.
+
+- 풀별 상품 목록 (바코드·이름·치수 상태·재고)
+- 대기열 배치 (순번·주문 수·투입 여부)
+- 토트 유휴/할당 수, 박스 종류·재고
+- 접수된 주문 수·배송단위 수
+- 위 내용을 요약한 `summary` 텍스트
+
+시연 중 화면은 Swagger로만 본다. 그래서 두 응답 모두 `summary` 한 항목만 읽어도 상태를
+알 수 있게 만든다. 두 엔드포인트에는 무엇을 하는지 Swagger 설명 문구를 단다.
 
 ## 5. 출고지시 투입 API [제안]
 
@@ -84,7 +108,7 @@ demo_order_queue(id PK, run_id, seq, batch_json JSONB, released_at NULL)
 | # | 단위 | 산출물 |
 | --- | --- | --- |
 | DM1 | 데이터 파일 형식 확정 + V3 데모 테이블 + 샘플 products.json(기존 6종으로) | 마이그레이션, 샘플 파일 |
-| DM2 | 새 런 시작 API | 컨트롤러·서비스·통합 테스트 |
+| DM2 | 리셋 API + 상태 조회 | 컨트롤러·서비스·통합 테스트 |
 | DM3 | 출고지시 큐 + next/auto API | 〃 |
 | DM4 | P1 접점 협의·문서 반영(02·04) | 문서 |
 | — | 실제 데이터셋 추출 (데이터셋 머신, 사용자·AI팀) | products.json·이미지·orders.json |
