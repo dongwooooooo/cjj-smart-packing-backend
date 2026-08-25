@@ -2,7 +2,10 @@ package com.awesome.backend.outbound.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.awesome.backend.inbound.entity.Category;
+import com.awesome.backend.inbound.entity.KoreanNetMaster;
 import com.awesome.backend.inbound.entity.Product;
+import com.awesome.backend.inbound.repository.CategoryRepository;
 import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.orders.entity.Line;
 import com.awesome.backend.orders.entity.Order;
@@ -23,6 +26,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -43,7 +47,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Shipment에는 PACKING 등으로 전이하는 정상 메서드가 없고 finalBoxId를 채우는 메서드도 없어,
  * LineShipmentControllerIT과 같이 ReflectionTestUtils로 테스트 픽스처의 상태(status, finalBoxId)를
- * 직접 설정한다. Product도 마찬가지로 manual() 팩토리에 없는 취급속성 플래그(is_refrigerate 등)를
+ * 직접 설정한다. Product도 마찬가지로 fromMaster() 팩토리에 없는 취급속성 플래그(is_refrigerate 등)를
  * ReflectionTestUtils로 직접 세팅해 저장한다 — ProductRepository는 프로덕션 코드에서는 읽기
  * 전용이지만, 테스트에서 그 리포지토리로 픽스처를 저장하는 것 자체는 금지 대상이 아니다.
  */
@@ -65,6 +69,7 @@ class ShipmentDetailControllerIT {
     @Autowired ToteRepository toteRepository;
     @Autowired ToteAssignmentRepository toteAssignmentRepository;
     @Autowired ProductRepository productRepository;
+    @Autowired CategoryRepository categoryRepository;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -175,8 +180,19 @@ class ShipmentDetailControllerIT {
 
     private Product saveProduct(
             int salt, String mediumCategoryCode, boolean refrigerate, boolean fragile, boolean irregular) {
-        Product product = Product.manual(
-                uniqueGtin(salt), "테스트상품" + salt, mediumCategoryCode, "https://placehold.co/300?text=test");
+        Category category = categoryRepository.findById(mediumCategoryCode).orElseThrow();
+
+        // KoreanNetMaster는 protected 무인자 생성자만 있어 BeanUtils로 인스턴스를 만든다.
+        // Product.fromMaster()는 필드값만 읽는 순수 팩토리라 이 인스턴스를 DB에 저장할 필요는 없다.
+        KoreanNetMaster master = BeanUtils.instantiateClass(KoreanNetMaster.class);
+        ReflectionTestUtils.setField(master, "gtin", uniqueGtin(salt));
+        ReflectionTestUtils.setField(master, "productName", "테스트상품" + salt);
+        ReflectionTestUtils.setField(master, "mediumCategory", category);
+        ReflectionTestUtils.setField(master, "imageUrl", "https://placehold.co/300?text=test");
+        ReflectionTestUtils.setField(master, "batchId", "IT-BATCH");
+        ReflectionTestUtils.setField(master, "importedAt", LocalDateTime.now());
+
+        Product product = Product.fromMaster(master, "https://placehold.co/300?text=test");
         ReflectionTestUtils.setField(product, "refrigerate", refrigerate);
         ReflectionTestUtils.setField(product, "fragile", fragile);
         ReflectionTestUtils.setField(product, "irregular", irregular);
