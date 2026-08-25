@@ -1,19 +1,21 @@
 package com.awesome.backend.outbound.controller;
 
 import com.awesome.backend.outbound.service.ShipmentBoxOverrideService;
+import com.awesome.backend.outbound.service.ShipmentCompleteService;
 import com.awesome.backend.outbound.service.ShipmentDetailService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 배송단위(shipment) 상세 조회·박스 오버라이드 API. docs/02-api-spec.md 3-2, 3-3.
+ * 배송단위(shipment) 상세 조회·박스 오버라이드·포장완료 API. docs/02-api-spec.md 3-2, 3-3, 3-8.
  *
- * <p>둘 다 같은 리소스({@code /shipments/{shipmentId}})를 다뤄 한 컨트롤러에 묶는다.
+ * <p>전부 같은 리소스({@code /shipments/{shipmentId}})를 다뤄 한 컨트롤러에 묶는다.
  */
 @RestController
 @RequestMapping("/api/v1/shipments")
@@ -21,12 +23,15 @@ public class ShipmentDetailController {
 
     private final ShipmentDetailService shipmentDetailService;
     private final ShipmentBoxOverrideService shipmentBoxOverrideService;
+    private final ShipmentCompleteService shipmentCompleteService;
 
     public ShipmentDetailController(
             ShipmentDetailService shipmentDetailService,
-            ShipmentBoxOverrideService shipmentBoxOverrideService) {
+            ShipmentBoxOverrideService shipmentBoxOverrideService,
+            ShipmentCompleteService shipmentCompleteService) {
         this.shipmentDetailService = shipmentDetailService;
         this.shipmentBoxOverrideService = shipmentBoxOverrideService;
+        this.shipmentCompleteService = shipmentCompleteService;
     }
 
     @GetMapping("/{shipmentId}")
@@ -38,5 +43,11 @@ public class ShipmentDetailController {
     public BoxOverrideResponse overrideBox(
             @PathVariable Long shipmentId, @Valid @RequestBody BoxOverrideRequest request) {
         return shipmentBoxOverrideService.override(shipmentId, request.boxTypeId());
+    }
+
+    /** 포장 완료 처리. docs/02-api-spec.md 3-8. */
+    @PostMapping("/{shipmentId}/complete")
+    public ShipmentCompleteResponse complete(@PathVariable Long shipmentId) {
+        return shipmentCompleteService.complete(shipmentId);
     }
 }
