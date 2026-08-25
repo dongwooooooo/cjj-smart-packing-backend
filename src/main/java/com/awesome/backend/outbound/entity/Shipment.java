@@ -144,4 +144,17 @@ public class Shipment {
         this.status = Status.PACKED;
         this.packedAt = LocalDateTime.now();
     }
+
+    /**
+     * PACKED → LOADED 전이 (PUT /shipments/{shipmentId}/load, docs/02-api-spec.md 3-9). 로드맵 Phase D
+     * 마지막 — "적재(상태값만 — 시연 범위 밖), 가장 단순, 검증도 최소한만"이라 명시된 API라
+     * PACKED 여부 외 다른 검증은 하지 않는다. startPacking()과 같은 스타일로 다른 상태면
+     * IllegalStateException을 던져 호출자(ShipmentLoadService)가 INVALID_STATE로 변환한다.
+     */
+    public void load() {
+        if (status != Status.PACKED) {
+            throw new IllegalStateException("LOADED로 전이할 수 없는 상태입니다: " + status);
+        }
+        this.status = Status.LOADED;
+    }
 }

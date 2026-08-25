@@ -3,6 +3,7 @@ package com.awesome.backend.outbound.controller;
 import com.awesome.backend.outbound.service.ShipmentBoxOverrideService;
 import com.awesome.backend.outbound.service.ShipmentCompleteService;
 import com.awesome.backend.outbound.service.ShipmentDetailService;
+import com.awesome.backend.outbound.service.ShipmentLoadService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 배송단위(shipment) 상세 조회·박스 오버라이드·포장완료 API. docs/02-api-spec.md 3-2, 3-3, 3-8.
+ * 배송단위(shipment) 상세 조회·박스 오버라이드·포장완료·적재 API. docs/02-api-spec.md 3-2, 3-3, 3-8, 3-9.
  *
  * <p>전부 같은 리소스({@code /shipments/{shipmentId}})를 다뤄 한 컨트롤러에 묶는다.
  */
@@ -24,14 +25,17 @@ public class ShipmentDetailController {
     private final ShipmentDetailService shipmentDetailService;
     private final ShipmentBoxOverrideService shipmentBoxOverrideService;
     private final ShipmentCompleteService shipmentCompleteService;
+    private final ShipmentLoadService shipmentLoadService;
 
     public ShipmentDetailController(
             ShipmentDetailService shipmentDetailService,
             ShipmentBoxOverrideService shipmentBoxOverrideService,
-            ShipmentCompleteService shipmentCompleteService) {
+            ShipmentCompleteService shipmentCompleteService,
+            ShipmentLoadService shipmentLoadService) {
         this.shipmentDetailService = shipmentDetailService;
         this.shipmentBoxOverrideService = shipmentBoxOverrideService;
         this.shipmentCompleteService = shipmentCompleteService;
+        this.shipmentLoadService = shipmentLoadService;
     }
 
     @GetMapping("/{shipmentId}")
@@ -49,5 +53,10 @@ public class ShipmentDetailController {
     @PostMapping("/{shipmentId}/complete")
     public ShipmentCompleteResponse complete(@PathVariable Long shipmentId) {
         return shipmentCompleteService.complete(shipmentId);
+    }
+
+    @PutMapping("/{shipmentId}/load")
+    public ShipmentLoadResponse load(@PathVariable Long shipmentId) {
+        return shipmentLoadService.load(shipmentId);
     }
 }
