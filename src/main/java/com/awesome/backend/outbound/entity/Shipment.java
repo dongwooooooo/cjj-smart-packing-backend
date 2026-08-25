@@ -85,7 +85,43 @@ public class Shipment {
         return lineId;
     }
 
+    public Long recommendedBoxId() {
+        return recommendedBoxId;
+    }
+
+    public Long finalBoxId() {
+        return finalBoxId;
+    }
+
+    public boolean fillerRecommended() {
+        return fillerRecommended;
+    }
+
     public void assignTote() {
         this.status = Status.TOTE_ASSIGNED;
+    }
+
+    /**
+     * TOTE_ASSIGNED → PACKING 전이 (POST /totes/scan, docs/02-api-spec.md 3-5, D-14).
+     * 이미 PACKING이면 재스캔 멱등 처리로 아무것도 하지 않는다. 그 외 상태(PLANNED/PACKED/LOADED)는
+     * 활성 tote_assignment가 있는데도 아직 포장을 시작하지 않았거나 이미 끝난 것이므로 데이터
+     * 정합성이 깨진 경우다 — 호출자(ToteScanService)가 잡아 INVALID_STATE로 변환한다.
+     */
+    public void startPacking() {
+        if (status == Status.TOTE_ASSIGNED) {
+            this.status = Status.PACKING;
+            return;
+        }
+        if (status != Status.PACKING) {
+            throw new IllegalStateException("PACKING으로 전이할 수 없는 상태입니다: " + status);
+        }
+    }
+
+    /**
+     * 박스 오버라이드 (PUT /shipments/{shipmentId}/box, docs/02-api-spec.md 3-3). 상태 제약 없이
+     * 무조건 세팅한다 — assignTote()와 같은 무조건부 스타일.
+     */
+    public void overrideBox(Long boxTypeId) {
+        this.finalBoxId = boxTypeId;
     }
 }
