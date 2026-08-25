@@ -18,6 +18,7 @@ public enum ErrorCode {
     INVALID_STATE(HttpStatus.CONFLICT),
     OUT_OF_STOCK(HttpStatus.CONFLICT),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST),
+    ROUTE_NOT_FOUND(HttpStatus.NOT_FOUND),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final HttpStatus status;
