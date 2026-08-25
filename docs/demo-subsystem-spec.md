@@ -89,4 +89,4 @@ demo_order_queue(id PK, run_id, seq, batch_json JSONB, released_at NULL)
 | DM4 | P1 접점 협의·문서 반영(02·04) | 문서 |
 | — | 실제 데이터셋 추출 (데이터셋 머신, 사용자·AI팀) | products.json·이미지·orders.json |
 
-기존 demo/prepare-demo.sql·README는 DM2 머지 시 제거. 런 방식 결정 근거: 파괴적 조작 없이 리허설 반복, 이력 보존, 시연 DB에 타 데이터가 있어도 안전.
+준비 SQL 방식(PR #13)은 머지하지 않고 닫았다. 그 리허설에서 나온 지식 3건은 DM2의 demo/README.md에 반영한다: ① 재빌드 직후 구 컨테이너가 응답할 수 있어 `docker compose ps`로 backend 기동 시각 확인 ② 토트 스캔→배송단위 상세 API는 P2 미구현 — 연결 가능한 건 라인별 배송단위 목록뿐 ③ 이전 런 종결이 활성 할당만 해제하므로 수동으로 잠근 토트는 별도 복구. 런 방식 결정 근거: 파괴적 조작 없이 리허설 반복, 이력 보존, 시연 DB에 타 데이터가 있어도 안전.
