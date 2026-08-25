@@ -40,6 +40,8 @@ products.json 항목:
 - `dims`는 두 풀 모두 필수 — INBOUND는 정답치(추론 비교·mock 기준)로 데모 테이블에, OUTBOUND는 상품 확정치로 적재
 - 치수 축 규약(D-18) 적용: width ≥ length가 되도록 추출 시 정렬
 - ⚠️ 추출 스크립트는 데이터셋 머신에서 실행 — 이 명세는 산출 파일 형식만 정한다
+- **서버 접근 [확정]**: `demo.data-dir` 프로퍼티(기본 `./demo/data`)로 읽는다. Dockerfile이 `demo/`를 이미지에 COPY — 컨테이너 WORKDIR 기준 같은 상대 경로로 동작. 클래스패스 이동·볼륨 마운트는 기각 (경로 규칙이 갈라지거나 실행 방법이 늘어남)
+- orders.json의 `receiptNo`는 **파일 전체(모든 배치) 통틀어 유일** — 로더가 검증한다. 실제 주문번호는 런 시작 시 서버가 만든다 (§4-4)
 
 ## 3. 데모 테이블 (V3 마이그레이션) [제안]
 
@@ -58,7 +60,7 @@ demo_order_queue(id PK, run_id, seq, batch_json JSONB, released_at NULL)
 1. 이전 런 종결 — 활성 토트 할당 해제(released_at 기록), 토트 전부 IDLE. 진행 중(PLANNED·TOTE_ASSIGNED·PACKING) 배송단위와 그 주문은 LOADED로 종결(취소 상태가 없어 시연 범위 밖 종료 상태를 빌린다). 미확정 측정 세션은 DISCARDED
 2. 박스 재고 seed값으로 복원 (값 갱신)
 3. products.json 적재 — 마스터·상품 **upsert**. INBOUND: dim_status=NONE·치수 NULL·재고 0·demo_product 갱신 / OUTBOUND: 치수 CONFIRMED·재고를 목표값으로 맞추는 원장 ADJUST 기록
-4. orders.json → demo_order_queue 적재 (run_id, seq). 주문번호는 `R-{run}-{seq}`로 런마다 유일
+4. orders.json → demo_order_queue 적재 (run_id, seq=배치 순번). **주문번호 = `{runId}-{파일 receiptNo}`** (예: `R3-DEMO-0001`) — 런마다 유일하고 파일의 어느 주문인지 추적 가능. 치환은 큐 적재 시점에 batch_json에 반영
 5. 응답: runId, 풀별 상품 수, 대기 배치 수, 토트·박스 상태 요약
 
 멱등: 연속 호출은 새 런을 하나 더 만들 뿐, 이전 런 데이터는 이력으로 남는다.
