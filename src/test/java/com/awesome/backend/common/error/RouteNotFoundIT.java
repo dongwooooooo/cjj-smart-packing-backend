@@ -24,7 +24,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *
  * <p>{@code GlobalExceptionHandler}의 catch-all({@code @ExceptionHandler(Exception.class)})이
  * Spring이 던지는 {@code NoResourceFoundException}까지 삼켜서 진짜 서버 오류와 구분 없이
- * INTERNAL_ERROR(500)로 응답하던 버그의 회귀 테스트. {@code /api/v1/admin/demo/orders/next}는
+ * INTERNAL_ERROR(500)로 응답하던 버그의 회귀 테스트. {@code /api/v1/definitely-not-a-real-route}는
  * 아직 구현되지 않은(제안 단계) API라 "존재하지 않는 경로" 표본으로 계속 안전하게 쓸 수 있다.
  *
  * <p>가벼운 {@code @WebMvcTest}가 아니라 기존 통합테스트 스타일({@code DemoResetSequenceIT})을
@@ -41,7 +41,7 @@ class RouteNotFoundIT {
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18.6");
 
-    private static final String UNMAPPED_ROUTE = "/api/v1/admin/demo/orders/next";
+    private static final String UNMAPPED_ROUTE = "/api/v1/definitely-not-a-real-route";
     private static final String EXISTING_ROUTE = "/api/v1/admin/demo/status";
 
     @Autowired WebApplicationContext context;
@@ -76,5 +76,14 @@ class RouteNotFoundIT {
     void 기존_정상_라우트는_영향받지_않는다() throws Exception {
         mvc().perform(get(EXISTING_ROUTE))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void 존재하는_경로에_잘못된_메서드면_405와_공통_에러_포맷으로_응답한다() throws Exception {
+        // POST 전용 경로에 GET. 여기서 500이 나오면 catch-all 이 다시 삼키고 있는 것이다.
+        mvc().perform(get("/api/v1/admin/demo/reset"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code", notNullValue()));
     }
 }
