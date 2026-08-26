@@ -201,3 +201,17 @@ curl -s localhost:8000/api/v1/lines/1/shipments | python3 -m json.tool
 | 접수가 400, detail에 `existingReceiptNos` | 같은 배치를 두 번 넣었다. 다음 배치를 넣거나 리셋한다 |
 | 접수가 400, detail에 `gtin` | 치수가 확정되지 않은 상품이다. 입고 풀 상품을 출고지시에 넣었는지 확인 |
 | 접수가 500 | 유휴 토트가 없다. 리셋하면 전부 반납된다 |
+
+## 시연 사진 (S3)
+
+사진은 저장소에 두지 않는다 (D-25). `products.json` 의 `images` 항목이 곧 S3 키이고,
+서버는 `STORAGE_BUCKET` 이 설정돼 있으면 S3 에서 읽는다. 비어 있으면 로컬
+`demo/data/images` 를 읽고 서버가 직접 서빙한다 — 개발·테스트용 경로다.
+
+```bash
+# 데이터셋에서 추린 사진을 demo/data/images/{gtin}/cam1~3.jpg 로 둔 뒤
+STORAGE_BUCKET=<버킷> bash demo/sync-images.sh
+```
+
+촬영본은 추론이 끝나면 `measurements/{sessionId}/cam{n}.jpg` 로 저장된다. DB 에는 이 키만
+남고 조회 주소는 응답을 만들 때마다 발급한다 — S3 임시 주소에 유효시간이 있어서다.

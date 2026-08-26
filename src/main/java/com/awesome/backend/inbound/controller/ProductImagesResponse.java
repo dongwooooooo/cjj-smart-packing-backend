@@ -2,6 +2,7 @@ package com.awesome.backend.inbound.controller;
 
 import com.awesome.backend.inbound.entity.MeasurementImage;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 /**
  * 제품 원본 이미지 응답 (02 §1-6). 출고 포장 화면(P2)이 제품을 클릭했을 때 쓴다.
@@ -18,10 +19,12 @@ public record ProductImagesResponse(String source, List<Image> images) {
     public record Image(Short cameraNo, String url) {
     }
 
-    public static ProductImagesResponse ofMeasurement(List<MeasurementImage> images) {
+    /** 촬영본은 보관소 키로만 저장돼 있어 조회 주소를 여기서 발급한다 (D-25). */
+    public static ProductImagesResponse ofMeasurement(List<MeasurementImage> images,
+                                                     UnaryOperator<String> urlOf) {
         return new ProductImagesResponse(SOURCE_MEASUREMENT,
                 images.stream()
-                        .map(image -> new Image(image.getCameraNo(), image.getFilePath()))
+                        .map(image -> new Image(image.getCameraNo(), urlOf.apply(image.getFilePath())))
                         .toList());
     }
 

@@ -36,15 +36,18 @@ public class MeasurementWriter {
     private final ProductRepository productRepository;
     private final MeasurementSessionRepository sessionRepository;
     private final CategoryAttributeMapRepository categoryAttributeMapRepository;
+    private final MeasurementImageSource imageSource;
     private final MeasurementGate gate;
 
     public MeasurementWriter(ProductRepository productRepository,
                              MeasurementSessionRepository sessionRepository,
                              CategoryAttributeMapRepository categoryAttributeMapRepository,
+                             MeasurementImageSource imageSource,
                              MeasurementGate gate) {
         this.productRepository = productRepository;
         this.sessionRepository = sessionRepository;
         this.categoryAttributeMapRepository = categoryAttributeMapRepository;
+        this.imageSource = imageSource;
         this.gate = gate;
     }
 
@@ -78,23 +81,21 @@ public class MeasurementWriter {
 
         attachImages(session, images);
 
-        return MeasurementResponse.inferred(session, handlingDefaults(product));
+        return MeasurementResponse.inferred(session, handlingDefaults(product), imageSource::url);
     }
 
     /**
-     * 카메라 3대분 이미지 경로를 붙인다. 1-6 제품 이미지 조회가 이 경로를 그대로 돌려준다.
+     * 추론에 쓴 사진을 세션 키로 보관소에 넣고, 그 키를 세션에 붙인다 (D-25).
+     * 1-6 제품 이미지 조회가 같은 키를 읽어 조회 주소를 발급한다.
      *
-     * <p>추론에 쓴 사진이 있으면 그 조회 URL 을 기록한다. 없으면(mock 에 데모 이미지 없는 상품)
-     * 실제 파일 없이 경로 문자열만 남긴다 — 실물 촬영이 붙으면 저장 위치만 바뀐다.
+     * <p>DB 에 조회 주소를 넣지 않는 이유는 S3 임시 주소에 유효시간이 있어서다 — 저장해 두면
+     * 곧 못 쓰는 값이 된다.
+     *
+     * <p>사진이 없는 경우(mock 추론은 사진을 보지 않는다) 붙일 것도 없다.
      */
     private void attachImages(MeasurementSession session, List<CameraImage> images) {
-        if (!images.isEmpty()) {
-            images.forEach(image -> session.addImage(image.cameraNo(), image.url()));
-            return;
-        }
-        for (short cameraNo = 1; cameraNo <= MeasurementImageSource.CAMERA_COUNT; cameraNo++) {
-            session.addImage(cameraNo, "/files/m/%d-%d.jpg".formatted(session.getId(), cameraNo));
-        }
+        images.forEach(image -> session.addImage(image.cameraNo(),
+                imageSource.store(session.getId(), image)));
     }
 
     /** 분류별 취급속성 기본값. 행이 없는 분류는 전부 false 로 취급한다 (03 §2). */

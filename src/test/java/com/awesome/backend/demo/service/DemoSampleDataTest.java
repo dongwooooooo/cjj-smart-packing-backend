@@ -48,22 +48,24 @@ class DemoSampleDataTest {
     void 두_풀에_상품이_고르게_들어_있다() {
         List<DemoProductSpec> products = loader.loadProducts(DATA_DIR);
 
-        assertThat(products).hasSize(6);
-        assertThat(products).filteredOn(p -> p.pool() == DemoProduct.Pool.INBOUND).hasSize(3);
-        assertThat(products).filteredOn(p -> p.pool() == DemoProduct.Pool.OUTBOUND).hasSize(3);
+        assertThat(products).hasSize(16);
+        assertThat(products).filteredOn(p -> p.pool() == DemoProduct.Pool.INBOUND).hasSize(6);
+        assertThat(products).filteredOn(p -> p.pool() == DemoProduct.Pool.OUTBOUND).hasSize(10);
     }
 
     @Test
-    void 입고_풀은_재고가_비어_있고_이미지가_실제로_있다() {
+    void 입고_풀은_재고가_비어_있고_카메라_3대분_이미지를_가리킨다() {
+        // 사진 실물은 S3 에 있고 저장소에 두지 않는다 (D-25). 여기서는 키가 카메라 3대분으로
+        // 선언돼 있는지만 본다 — 실물이 올라갔는지는 배포 절차(demo/README.md)가 확인한다.
         for (DemoProductSpec product : loader.loadProducts(DATA_DIR)) {
             if (product.pool() != DemoProduct.Pool.INBOUND) {
                 continue;
             }
             assertThat(product.stockQty()).isZero();
             assertThat(product.images()).hasSize(3);
-            for (String image : product.images()) {
-                assertThat(Files.exists(DATA_DIR.resolve(image)))
-                        .as("이미지 파일 %s", image).isTrue();
+            for (short cameraNo = 1; cameraNo <= 3; cameraNo++) {
+                assertThat(product.images().get(cameraNo - 1))
+                        .isEqualTo("images/%s/cam%d.jpg".formatted(product.gtin(), cameraNo));
             }
         }
     }
