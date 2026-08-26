@@ -62,5 +62,366 @@
         ]
       }
     ]
+  },
+  {
+    "batchId": "DEMO-4",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0004",
+        "regionCode": "SEOUL",
+        "orderedAt": "2026-08-31T10:00:00",
+        "items": [
+          {
+            "gtin": "8806179696691",
+            "qty": 2
+          },
+          {
+            "gtin": "8801047150022",
+            "qty": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-5",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0005",
+        "regionCode": "GYEONGGI",
+        "orderedAt": "2026-08-31T10:20:00",
+        "items": [
+          {
+            "gtin": "8801007867045",
+            "qty": 3
+          },
+          {
+            "gtin": "8801056177645",
+            "qty": 1
+          },
+          {
+            "gtin": "8806179696691",
+            "qty": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-6",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0006",
+        "regionCode": "BUSAN",
+        "orderedAt": "2026-08-31T10:40:00",
+        "items": [
+          {
+            "gtin": "8801047150022",
+            "qty": 1
+          },
+          {
+            "gtin": "8801094432614",
+            "qty": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-7",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0007",
+        "regionCode": "SEOUL",
+        "orderedAt": "2026-08-31T11:00:00",
+        "items": [
+          {
+            "gtin": "8801007526492",
+            "qty": 3
+          },
+          {
+            "gtin": "8801047123729",
+            "qty": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-8",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0008",
+        "regionCode": "GYEONGGI",
+        "orderedAt": "2026-08-31T11:20:00",
+        "items": [
+          {
+            "gtin": "8801094432614",
+            "qty": 2
+          },
+          {
+            "gtin": "8801007867045",
+            "qty": 3
+          },
+          {
+            "gtin": "8801047150022",
+            "qty": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-9",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0009",
+        "regionCode": "BUSAN",
+        "orderedAt": "2026-08-31T11:40:00",
+        "items": [
+          {
+            "gtin": "8801097168800",
+            "qty": 2
+          },
+          {
+            "gtin": "8801094432614",
+            "qty": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-10",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0010",
+        "regionCode": "SEOUL",
+        "orderedAt": "2026-08-31T12:00:00",
+        "items": [
+          {
+            "gtin": "8801047150022",
+            "qty": 2
+          },
+          {
+            "gtin": "8801007867045",
+            "qty": 2
+          },
+          {
+            "gtin": "8801019206351",
+            "qty": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-11",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0011",
+        "regionCode": "GYEONGGI",
+        "orderedAt": "2026-08-31T12:20:00",
+        "items": [
+          {
+            "gtin": "8801056177645",
+            "qty": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-12",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0012",
+        "regionCode": "BUSAN",
+        "orderedAt": "2026-08-31T12:40:00",
+        "items": [
+          {
+            "gtin": "8806179696691",
+            "qty": 1
+          },
+          {
+            "gtin": "8806325610724",
+            "qty": 1
+          }
+        ]
+      },
+      {
+        "receiptNo": "R-DEMO-0013",
+        "regionCode": "BUSAN",
+        "orderedAt": "2026-08-31T12:47:00",
+        "items": [
+          {
+            "gtin": "8801097168800",
+            "qty": 1
+          },
+          {
+            "gtin": "8806179696691",
+            "qty": 3
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-13",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0014",
+        "regionCode": "SEOUL",
+        "orderedAt": "2026-08-31T13:00:00",
+        "items": [
+          {
+            "gtin": "8801019206351",
+            "qty": 3
+          },
+          {
+            "gtin": "8801056177645",
+            "qty": 1
+          },
+          {
+            "gtin": "8801097168800",
+            "qty": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-14",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0015",
+        "regionCode": "GYEONGGI",
+        "orderedAt": "2026-08-31T13:20:00",
+        "items": [
+          {
+            "gtin": "8806325610724",
+            "qty": 1
+          },
+          {
+            "gtin": "8806179696691",
+            "qty": 1
+          },
+          {
+            "gtin": "8801007526492",
+            "qty": 3
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-15",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0016",
+        "regionCode": "BUSAN",
+        "orderedAt": "2026-08-31T13:40:00",
+        "items": [
+          {
+            "gtin": "8801094432614",
+            "qty": 1
+          }
+        ]
+      },
+      {
+        "receiptNo": "R-DEMO-0017",
+        "regionCode": "BUSAN",
+        "orderedAt": "2026-08-31T13:47:00",
+        "items": [
+          {
+            "gtin": "8801007867045",
+            "qty": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-16",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0018",
+        "regionCode": "SEOUL",
+        "orderedAt": "2026-08-31T14:00:00",
+        "items": [
+          {
+            "gtin": "8801094432614",
+            "qty": 1
+          },
+          {
+            "gtin": "8801097168800",
+            "qty": 3
+          },
+          {
+            "gtin": "8801047150022",
+            "qty": 3
+          }
+        ]
+      },
+      {
+        "receiptNo": "R-DEMO-0019",
+        "regionCode": "SEOUL",
+        "orderedAt": "2026-08-31T14:07:00",
+        "items": [
+          {
+            "gtin": "8806325610724",
+            "qty": 2
+          },
+          {
+            "gtin": "8801007867045",
+            "qty": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-17",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0020",
+        "regionCode": "GYEONGGI",
+        "orderedAt": "2026-08-31T14:20:00",
+        "items": [
+          {
+            "gtin": "8806325610724",
+            "qty": 1
+          },
+          {
+            "gtin": "8806179696691",
+            "qty": 2
+          },
+          {
+            "gtin": "8801047150022",
+            "qty": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "batchId": "DEMO-18",
+    "orders": [
+      {
+        "receiptNo": "R-DEMO-0021",
+        "regionCode": "BUSAN",
+        "orderedAt": "2026-08-31T14:40:00",
+        "items": [
+          {
+            "gtin": "8801007867045",
+            "qty": 1
+          },
+          {
+            "gtin": "8801056177645",
+            "qty": 1
+          }
+        ]
+      }
+    ]
   }
 ]

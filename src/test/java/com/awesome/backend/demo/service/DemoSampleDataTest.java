@@ -90,18 +90,21 @@ class DemoSampleDataTest {
     }
 
     @Test
-    void 배치는_투입_순서대로_세_개다() {
+    void 배치는_투입_순서대로_번호가_이어진다() {
+        // 개수는 파일이 정한다. 여기서는 DEMO-1 부터 빠짐없이 이어지는지만 본다 —
+        // 투입이 맨 앞부터 하나씩이라 번호가 비면 순서가 어긋난다.
         List<String> batches = loader.loadOrderBatches(DATA_DIR);
 
-        assertThat(batches).hasSize(3);
-        assertThat(batches.get(0)).contains("DEMO-1");
-        assertThat(batches.get(1)).contains("DEMO-2");
-        assertThat(batches.get(2)).contains("DEMO-3");
+        assertThat(batches).hasSizeGreaterThanOrEqualTo(3);
+        for (int i = 0; i < batches.size(); i++) {
+            assertThat(batches.get(i)).contains("DEMO-" + (i + 1));
+        }
     }
 
     @Test
-    void 배치마다_보여줄_장면이_하나씩_있다() {
-        // 1번 합포장, 2번 분할, 3번 완충재 — 투입할 때마다 화면이 달라진다
+    void 앞선_세_배치가_합포장_분할_완충재를_보여준다() {
+        // 시연을 열면 세 장면이 차례로 나온다. 뒤 배치들은 대시보드를 채우는 몫이라
+        // 구성이 정해져 있지 않다.
         assertThat(planFor("R-DEMO-0001")).hasSize(1);
         assertThat(planFor("R-DEMO-0002")).hasSizeGreaterThan(1);
         assertThat(planFor("R-DEMO-0003")).anyMatch(ShipmentPlan::fillerRecommended);

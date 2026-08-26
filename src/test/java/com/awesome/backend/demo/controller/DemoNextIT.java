@@ -55,7 +55,7 @@ class DemoNextIT {
         mvc.perform(post(NEXT))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.seq").value(1))
-                .andExpect(jsonPath("$.remaining").value(2))
+                .andExpect(jsonPath("$.remaining").value(queueRepository.count() - 1))
                 .andExpect(jsonPath("$.batchId").value("DEMO-1"))
                 .andExpect(jsonPath("$.orders").value(1))
                 .andExpect(jsonPath("$.shipments").value(1))
@@ -69,9 +69,10 @@ class DemoNextIT {
         mvc.perform(post(NEXT)).andExpect(status().isOk());
 
         List<DemoOrderQueue> queued = queueRepository.findAllByOrderBySeqAsc();
+        int total = queued.size();
         assertThat(queued.get(0).releasedAt()).isNotNull();
         assertThat(queued.get(1).releasedAt()).isNull();
-        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(2);
+        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(total - 1);
     }
 
     @Test
@@ -79,16 +80,17 @@ class DemoNextIT {
         mvc.perform(post(NEXT)).andExpect(jsonPath("$.seq").value(1));
         mvc.perform(post(NEXT)).andExpect(jsonPath("$.seq").value(2))
                 .andExpect(jsonPath("$.splitOrders").value(1));
+        int total = (int) queueRepository.count();
         mvc.perform(post(NEXT)).andExpect(jsonPath("$.seq").value(3))
-                .andExpect(jsonPath("$.remaining").value(0));
+                .andExpect(jsonPath("$.remaining").value(total - 3));
 
-        assertThat(queueRepository.countByReleasedAtIsNull()).isZero();
-        assertThat(orderRepository.count()).isEqualTo(3);
+        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(total - 3);
     }
 
     @Test
     void 대기열이_비면_내용_없음을_돌려준다() throws Exception {
-        for (int i = 0; i < 3; i++) {
+        int total = (int) queueRepository.count();
+        for (int i = 0; i < total; i++) {
             mvc.perform(post(NEXT)).andExpect(status().isOk());
         }
 

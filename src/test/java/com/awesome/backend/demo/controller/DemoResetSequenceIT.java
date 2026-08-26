@@ -108,7 +108,7 @@ class DemoResetSequenceIT {
         assertThat(count("select count(*) from order_item")).isZero();
         assertThat(count("select count(*) from tote_assignment")).isZero();
         assertThat(count("select count(*) from tote where status <> 'IDLE'")).isZero();
-        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(3);
+        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(queueRepository.count());
     }
 
     @Test
@@ -133,7 +133,7 @@ class DemoResetSequenceIT {
         mvc.perform(post(RESET)).andExpect(status().isInternalServerError());
 
         assertThat(orderRepository.count()).isEqualTo(ordersBefore);
-        assertThat(queueRepository.count()).isEqualTo(3);
+        assertThat(queueRepository.count()).isEqualTo(18);
     }
 
     @Test
