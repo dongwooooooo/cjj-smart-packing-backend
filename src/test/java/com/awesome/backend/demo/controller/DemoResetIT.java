@@ -40,6 +40,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Transactional
 class DemoResetIT {
 
+    /** demo/data/orders.json 의 배치 수. 라인 대시보드를 채우려면 여러 개가 필요하다. */
+    private static final int BATCHES = 18;
+
+    /** V2 seed 10개 + V6 이 더한 30개. 접수가 주문마다 토트를 하나씩 잡는다. */
+    private static final int TOTES = 40;
+
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18.6");
@@ -73,8 +79,8 @@ class DemoResetIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.products.inbound").value(6))
                 .andExpect(jsonPath("$.products.outbound").value(10))
-                .andExpect(jsonPath("$.queuedBatches").value(3))
-                .andExpect(jsonPath("$.totes.idle").value(10))
+                .andExpect(jsonPath("$.queuedBatches").value(BATCHES))
+                .andExpect(jsonPath("$.totes.idle").value(TOTES))
                 .andExpect(jsonPath("$.totes.assigned").value(0))
                 .andExpect(jsonPath("$.boxTypes.stockQty").value(100))
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("입고 풀 6")));
@@ -122,11 +128,11 @@ class DemoResetIT {
         reset();
 
         List<DemoOrderQueue> queued = queueRepository.findAllByOrderBySeqAsc();
-        assertThat(queued).hasSize(3);
+        assertThat(queued).hasSize(BATCHES);
         assertThat(queued.getFirst().seq()).isEqualTo(1);
         assertThat(queued.getFirst().batchJson()).contains("R-DEMO-0001");
         assertThat(queued).allSatisfy(batch -> assertThat(batch.releasedAt()).isNull());
-        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(3);
+        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(BATCHES);
     }
 
     @Test
@@ -138,7 +144,7 @@ class DemoResetIT {
 
         assertThat(boxTypeRepository.findAll()).allSatisfy(
                 box -> assertThat(box.stockQty()).isEqualTo(100));
-        assertThat(toteRepository.findByStatusOrderByIdAsc(Tote.Status.IDLE)).hasSize(10);
+        assertThat(toteRepository.findByStatusOrderByIdAsc(Tote.Status.IDLE)).hasSize(TOTES);
     }
 
     @Test
@@ -163,16 +169,16 @@ class DemoResetIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.products[?(@.pool == 'INBOUND')].items.length()").value(6))
                 .andExpect(jsonPath("$.products[?(@.pool == 'OUTBOUND')].items.length()").value(10))
-                .andExpect(jsonPath("$.batches.length()").value(3))
+                .andExpect(jsonPath("$.batches.length()").value(BATCHES))
                 .andExpect(jsonPath("$.batches[0].seq").value(1))
                 .andExpect(jsonPath("$.batches[0].orderCount").value(1))
                 .andExpect(jsonPath("$.batches[0].released").value(false))
-                .andExpect(jsonPath("$.totes.idle").value(10))
+                .andExpect(jsonPath("$.totes.idle").value(TOTES))
                 .andExpect(jsonPath("$.boxTypes.stockQty").value(100))
                 .andExpect(jsonPath("$.progress.orders").value(0))
                 .andExpect(jsonPath("$.progress.shipments").value(0))
                 .andExpect(jsonPath("$.summary").value(
-                        org.hamcrest.Matchers.containsString("대기 배치 3개 중 0개 투입")));
+                        org.hamcrest.Matchers.containsString("대기 배치 " + BATCHES + "개 중 0개 투입")));
     }
 
     @Test
