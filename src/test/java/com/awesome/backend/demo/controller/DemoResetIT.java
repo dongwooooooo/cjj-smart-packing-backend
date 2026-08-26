@@ -68,6 +68,25 @@ class DemoResetIT {
     }
 
     @Test
+    void 목록에서_빠진_상품은_리셋이_데모에서_빼고_재고도_되돌린다() throws Exception {
+        // 지난 런의 잔여를 흉내낸다 — products.json 에 없는 상품이 데모 풀에 남아 있는 상태.
+        // 그대로 두면 화면 상품 수가 부풀고, 사진이 없어 촬영이 NO_IMAGES 로 실패한다.
+        String dropped = "8801234500011";
+        jdbcTemplate.update("""
+                insert into demo_product (gtin, pool, gt_width_cm, gt_length_cm, gt_height_cm, image_dir)
+                values (?, 'INBOUND', 7.0, 7.0, 23.0, 'images/' || ?)
+                on conflict (gtin) do nothing""", dropped, dropped);
+        jdbcTemplate.update("update product set stock_qty = 40 where gtin = ?", dropped);
+
+        reset();
+
+        assertThat(demoProductRepository.findById(dropped)).isEmpty();
+        assertThat(productRepository.findByGtin(dropped).orElseThrow().stockQty()).isZero();
+        // 파일에 있는 상품은 그대로 남는다
+        assertThat(demoProductRepository.count()).isEqualTo(16);
+    }
+
+    @Test
     void 리셋하면_요약을_돌려준다() throws Exception {
         mvc.perform(post(RESET))
                 .andExpect(status().isOk())
