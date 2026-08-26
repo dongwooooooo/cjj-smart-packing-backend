@@ -15,4 +15,10 @@ public record DemoResetSummary(Products products, int queuedBatches, Totes totes
 
     public record BoxTypes(int count, int stockQty) {
     }
+
+    /** 워밍 결과처럼 리셋 트랜잭션 밖에서 정해지는 항목을 요약 끝에 덧붙인다. */
+    public DemoResetSummary withExtraSummaryLine(String line) {
+        return new DemoResetSummary(products(), queuedBatches(), totes(), boxTypes(),
+                summary() + "\n" + line);
+    }
 }
