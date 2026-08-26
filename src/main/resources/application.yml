@@ -36,6 +36,15 @@ demo:
   # 촬영 계약의 타임아웃이 8초라, 시연 첫 장면이 그대로 실패로 보인다.
   warmup-inference: ${DEMO_WARMUP_INFERENCE:true}
 
+storage:
+  # 이미지 버킷. 비우면 로컬 디렉토리에 두고 정적으로 서빙한다 (개발·테스트, D-25)
+  bucket: ${STORAGE_BUCKET:}
+  region: ${STORAGE_AWS_REGION:ap-northeast-2}
+  # 임시 조회 주소 유효시간. 화면을 열어 둔 채 만료되지 않을 만큼 길고, 새어 나가도 오래 못 쓸 만큼 짧게
+  presign-ttl: ${STORAGE_PRESIGN_TTL:30m}
+  local-base-path: ${STORAGE_LOCAL_PATH:./demo/data}
+  local-url-prefix: /files/m/
+
 inference:
   # Lambda 함수 이름(별칭 포함, 예: logistics-dimension-api:live). 비우면 mock (D-04, D-24)
   lambda-function: ${INFERENCE_LAMBDA_FUNCTION:}

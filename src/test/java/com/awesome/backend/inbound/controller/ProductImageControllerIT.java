@@ -35,7 +35,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest(properties = {
         "inference.mock.min-confidence=0.95",
-        "inference.mock.max-confidence=0.99"
+        "inference.mock.max-confidence=0.99",
+        "storage.local-base-path=" + com.awesome.backend.support.DemoImageFixture.BASE_PATH
 })
 @Testcontainers
 @Transactional
@@ -56,6 +57,7 @@ class ProductImageControllerIT {
     @Autowired WebApplicationContext context;
     @Autowired ProductRepository productRepository;
     @Autowired MeasurementSessionRepository sessionRepository;
+    @Autowired com.awesome.backend.demo.repository.DemoProductRepository demoProductRepository;
     @PersistenceContext EntityManager em;
 
     private MockMvc mvc;
@@ -65,7 +67,9 @@ class ProductImageControllerIT {
         mvc = MockMvcBuilders.webAppContextSetup(context).build();
     }
 
+    /** 촬영본이 남으려면 사진이 있어야 한다 — 실제 사진은 S3 에 있으므로 테스트가 직접 만든다 (D-25). */
     private Long juiceId() {
+        com.awesome.backend.support.DemoImageFixture.create(demoProductRepository, JUICE);
         return productRepository.findByGtin(JUICE).map(Product::id).orElseThrow();
     }
 
@@ -103,7 +107,7 @@ class ProductImageControllerIT {
                 .andExpect(jsonPath("$.source").value("MEASUREMENT"))
                 .andExpect(jsonPath("$.images.length()").value(3))
                 .andExpect(jsonPath("$.images[0].cameraNo").value(1))
-                .andExpect(jsonPath("$.images[0].url").value("/files/m/%d-1.jpg".formatted(sessionId)))
+                .andExpect(jsonPath("$.images[0].url").value("/files/m/measurements/%d/cam1.jpg".formatted(sessionId)))
                 .andExpect(jsonPath("$.images[2].cameraNo").value(3));
     }
 
@@ -145,7 +149,7 @@ class ProductImageControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.source").value("MEASUREMENT"))
                 .andExpect(jsonPath("$.images[0].url")
-                        .value("/files/m/%d-1.jpg".formatted(secondSessionId)));
+                        .value("/files/m/measurements/%d/cam1.jpg".formatted(secondSessionId)));
     }
 
     @Test

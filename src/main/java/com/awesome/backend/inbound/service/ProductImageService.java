@@ -27,11 +27,14 @@ public class ProductImageService {
 
     private final ProductRepository productRepository;
     private final MeasurementSessionRepository sessionRepository;
+    private final MeasurementImageSource imageSource;
 
     public ProductImageService(ProductRepository productRepository,
-                               MeasurementSessionRepository sessionRepository) {
+                               MeasurementSessionRepository sessionRepository,
+                               MeasurementImageSource imageSource) {
         this.productRepository = productRepository;
         this.sessionRepository = sessionRepository;
+        this.imageSource = imageSource;
     }
 
     @Transactional(readOnly = true)
@@ -41,7 +44,7 @@ public class ProductImageService {
                         "상품을 찾을 수 없습니다.", Map.of("productId", productId)));
 
         return confirmedImages(productId)
-                .map(ProductImagesResponse::ofMeasurement)
+                .map(images -> ProductImagesResponse.ofMeasurement(images, imageSource::url))
                 // product.image_url 은 스캔 시 마스터에서 복사한 값이라 NOT NULL 이 보장된다.
                 // 마스터에 이미지가 없었으면 placeholder 가 들어 있다.
                 .orElseGet(() -> ProductImagesResponse.ofMasterFallback(product.imageUrl()));

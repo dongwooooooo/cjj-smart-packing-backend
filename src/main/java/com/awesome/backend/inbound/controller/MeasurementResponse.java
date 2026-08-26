@@ -5,6 +5,7 @@ import com.awesome.backend.inbound.entity.MeasurementSession;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 /**
  * 촬영·추론 응답 (02 §1-3). 성공/실패가 같은 200 응답이고 모양만 다르다 —
@@ -32,10 +33,14 @@ public record MeasurementResponse(
     public record Dimensions(BigDecimal widthCm, BigDecimal lengthCm, BigDecimal heightCm) {
     }
 
+    /**
+     * DB 에는 보관소 키만 있고 조회 주소는 응답을 만들 때 발급한다 — S3 임시 주소는
+     * 유효시간이 있어 저장해 두면 곧 못 쓰는 값이 된다 (D-25).
+     */
     public record Image(Short cameraNo, String url) {
 
-        static Image from(MeasurementImage image) {
-            return new Image(image.getCameraNo(), image.getFilePath());
+        static Image from(MeasurementImage image, UnaryOperator<String> urlOf) {
+            return new Image(image.getCameraNo(), urlOf.apply(image.getFilePath()));
         }
     }
 
@@ -43,7 +48,9 @@ public record MeasurementResponse(
     public record HandlingDefaults(boolean refrigerate, boolean fragile, boolean irregular) {
     }
 
-    public static MeasurementResponse inferred(MeasurementSession session, HandlingDefaults handlingDefaults) {
+    public static MeasurementResponse inferred(MeasurementSession session,
+                                              HandlingDefaults handlingDefaults,
+                                              UnaryOperator<String> urlOf) {
         return new MeasurementResponse(
                 session.getId(),
                 session.getStatus().name(),
@@ -53,7 +60,7 @@ public record MeasurementResponse(
                 session.getConfidence(),
                 session.isGatePassed(),
                 session.getGateFailReasons(),
-                session.getImages().stream().map(Image::from).toList(),
+                session.getImages().stream().map(image -> Image.from(image, urlOf)).toList(),
                 handlingDefaults,
                 null);
     }

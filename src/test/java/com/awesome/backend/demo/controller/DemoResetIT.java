@@ -71,13 +71,13 @@ class DemoResetIT {
     void 리셋하면_요약을_돌려준다() throws Exception {
         mvc.perform(post(RESET))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.products.inbound").value(3))
-                .andExpect(jsonPath("$.products.outbound").value(3))
+                .andExpect(jsonPath("$.products.inbound").value(6))
+                .andExpect(jsonPath("$.products.outbound").value(10))
                 .andExpect(jsonPath("$.queuedBatches").value(3))
                 .andExpect(jsonPath("$.totes.idle").value(10))
                 .andExpect(jsonPath("$.totes.assigned").value(0))
                 .andExpect(jsonPath("$.boxTypes.stockQty").value(100))
-                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("입고 풀 3")));
+                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("입고 풀 6")));
     }
 
     @Test
@@ -99,7 +99,7 @@ class DemoResetIT {
         reset();
 
         List<DemoProduct> outbound = demoProductRepository.findByPool(DemoProduct.Pool.OUTBOUND);
-        assertThat(outbound).hasSize(3);
+        assertThat(outbound).hasSize(10);
         for (DemoProduct demo : outbound) {
             Product product = productRepository.findByGtin(demo.gtin()).orElseThrow();
             assertThat(product.dimStatus()).isEqualTo(Product.DIM_STATUS_CONFIRMED);
@@ -114,7 +114,7 @@ class DemoResetIT {
 
         Integer ledgerRows = jdbcTemplate.queryForObject(
                 "select count(*) from inventory_tx", Integer.class);
-        assertThat(ledgerRows).isEqualTo(3);
+        assertThat(ledgerRows).isEqualTo(10);
     }
 
     @Test
@@ -161,8 +161,8 @@ class DemoResetIT {
 
         mvc.perform(get(STATUS))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.products[?(@.pool == 'INBOUND')].items.length()").value(3))
-                .andExpect(jsonPath("$.products[?(@.pool == 'OUTBOUND')].items.length()").value(3))
+                .andExpect(jsonPath("$.products[?(@.pool == 'INBOUND')].items.length()").value(6))
+                .andExpect(jsonPath("$.products[?(@.pool == 'OUTBOUND')].items.length()").value(10))
                 .andExpect(jsonPath("$.batches.length()").value(3))
                 .andExpect(jsonPath("$.batches[0].seq").value(1))
                 .andExpect(jsonPath("$.batches[0].orderCount").value(1))

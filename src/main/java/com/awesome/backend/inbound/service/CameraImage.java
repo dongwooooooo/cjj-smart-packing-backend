@@ -8,9 +8,9 @@ package com.awesome.backend.inbound.service;
  *
  * @param cameraNo 카메라 번호 1~3
  * @param jpeg     JPEG 바이트
- * @param url      1-3 응답에 실을 조회 경로
+ * @param key      보관소 키. DB 에 남는 값이며 조회 주소는 응답 때 발급한다 (D-25)
  */
-public record CameraImage(short cameraNo, byte[] jpeg, String url) {
+public record CameraImage(short cameraNo, byte[] jpeg, String key) {
 
     /** 모델 {@code views} 인자 표기. 촬영 회차(shot)는 1 로 고정이다. */
     public String view() {

@@ -9,3 +9,7 @@ bin/
 .DS_Store
 
 .env
+
+# 시연 이미지는 S3 에 둔다 (D-25). 로컬에는 내려받아 두고 커밋하지 않는다.
+demo/data/images/
+demo/data/measurements/

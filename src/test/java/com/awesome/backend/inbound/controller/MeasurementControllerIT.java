@@ -7,8 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.awesome.backend.demo.entity.DemoProduct;
 import com.awesome.backend.demo.repository.DemoProductRepository;
+import com.awesome.backend.support.DemoImageFixture;
 import com.awesome.backend.inbound.entity.MeasurementSession;
 import com.awesome.backend.inbound.entity.MeasurementStatus;
 import com.awesome.backend.inbound.entity.Product;
@@ -40,7 +40,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest(properties = {
         "inference.mock.min-confidence=0.95",
-        "inference.mock.max-confidence=0.99"
+        "inference.mock.max-confidence=0.99",
+        "storage.local-base-path=" + DemoImageFixture.BASE_PATH
 })
 @Testcontainers
 @Transactional
@@ -68,7 +69,9 @@ class MeasurementControllerIT {
         mvc = MockMvcBuilders.webAppContextSetup(context).build();
     }
 
+    /** 촬영본이 남으려면 사진이 있어야 한다 — 실제 사진은 S3 에 있으므로 테스트가 직접 만든다 (D-25). */
     private Long juiceId() {
+        DemoImageFixture.create(demoProductRepository, JUICE);
         return productRepository.findByGtin(JUICE).map(Product::id).orElseThrow();
     }
 
@@ -173,7 +176,7 @@ class MeasurementControllerIT {
     }
 
     @Test
-    void 이미지_경로는_세션과_카메라_번호로_만들어진다() throws Exception {
+    void 촬영본은_세션별_키로_보관소에_저장된다() throws Exception {
         Long productId = juiceId();
         mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content(body(productId)))
                 .andExpect(status().isOk());
@@ -182,30 +185,27 @@ class MeasurementControllerIT {
                 .findByProductIdAndStatusIn(productId, List.of(MeasurementStatus.INFERRED))
                 .getFirst();
 
+        // DB 에는 조회 주소가 아니라 보관소 키가 남는다 (D-25).
         assertThat(session.getImages()).extracting("filePath")
                 .containsExactly(
-                        "/files/m/%d-1.jpg".formatted(session.getId()),
-                        "/files/m/%d-2.jpg".formatted(session.getId()),
-                        "/files/m/%d-3.jpg".formatted(session.getId()));
+                        "measurements/%d/cam1.jpg".formatted(session.getId()),
+                        "measurements/%d/cam2.jpg".formatted(session.getId()),
+                        "measurements/%d/cam3.jpg".formatted(session.getId()));
     }
 
     @Test
-    void 데모_이미지가_있는_상품은_그_파일_URL이_실리고_정적으로_열린다() throws Exception {
-        // P3 데모 서브시스템이 demo/data/images/{gtin}/cam{n}.jpg 를 두고 demo_product.image_dir 로
-        // 가리킨다 (docs/demo-subsystem-spec.md §6). 리셋 API 대신 행만 직접 넣는다.
-        String gtin = "8801234500028";
-        Long productId = productRepository.findByGtin(gtin).map(Product::id).orElseThrow();
-        demoProductRepository.save(new DemoProduct(gtin, DemoProduct.Pool.INBOUND,
-                new java.math.BigDecimal("10.0"), new java.math.BigDecimal("8.0"),
-                new java.math.BigDecimal("5.0"), "images/" + gtin));
+    void 촬영본은_조회_주소로_내려가고_실제로_열린다() throws Exception {
+        Long productId = juiceId();
 
-        mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content(body(productId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.images[0].url").value("/files/m/" + gtin + "/cam1.jpg"))
-                .andExpect(jsonPath("$.images[2].url").value("/files/m/" + gtin + "/cam3.jpg"));
+        String url = com.jayway.jsonpath.JsonPath.read(
+                mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content(body(productId)))
+                        .andExpect(status().isOk())
+                        .andReturn().getResponse().getContentAsString(),
+                "$.images[0].url");
 
-        mvc.perform(get("/files/m/" + gtin + "/cam2.jpg"))
-                .andExpect(status().isOk());
+        // 로컬 보관소는 서버가 직접 서빙한다. S3 모드면 이 주소가 S3 임시 주소가 된다 (D-25).
+        assertThat(url).startsWith("/files/m/measurements/");
+        mvc.perform(get(url)).andExpect(status().isOk());
     }
 
     @Test
