@@ -27,44 +27,39 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MeasurementService {
 
-    /** 재촬영 시 정리 대상 — 아직 확정도 폐기도 안 된 세션. */
-    private static final List<MeasurementStatus> OPEN_STATUSES =
-            List.of(MeasurementStatus.INFERRED, MeasurementStatus.MEASURE_FAILED);
 
-    private static final MeasurementResponse.HandlingDefaults NO_HANDLING_DEFAULTS =
-            new MeasurementResponse.HandlingDefaults(false, false, false);
 
     private final ProductRepository productRepository;
     private final MeasurementSessionRepository sessionRepository;
-    private final CategoryAttributeMapRepository categoryAttributeMapRepository;
     private final MeasurementImageSource imageSource;
     private final InferenceClient inferenceClient;
     private final MeasurementGate gate;
+    private final MeasurementWriter writer;
 
     public MeasurementService(ProductRepository productRepository,
                               MeasurementSessionRepository sessionRepository,
-                              CategoryAttributeMapRepository categoryAttributeMapRepository,
                               MeasurementImageSource imageSource,
                               InferenceClient inferenceClient,
-                              MeasurementGate gate) {
+                              MeasurementGate gate, MeasurementWriter writer) {
         this.productRepository = productRepository;
         this.sessionRepository = sessionRepository;
-        this.categoryAttributeMapRepository = categoryAttributeMapRepository;
         this.imageSource = imageSource;
         this.inferenceClient = inferenceClient;
         this.gate = gate;
+        this.writer = writer;
     }
 
     /**
      * 촬영 1회. 같은 productId 로 다시 부르면 재촬영이며, 이전 미확정 세션은 DISCARDED 로 정리한다.
+     *
+     * <p>추론 호출은 트랜잭션 밖에서 한다. Lambda 는 콜드 스타트에 10초까지 걸려서, 트랜잭션
+     * 안에서 부르면 그동안 DB 커넥션을 잡고 있게 된다. 세션은 결과가 정해진 뒤에 만들어지므로
+     * (INFERRED / MEASURE_FAILED 둘 중 하나) 순서를 이렇게 두어도 중간 상태가 생기지 않는다.
      */
-    @Transactional
     public MeasurementResponse measure(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ApiException(ErrorCode.PRODUCT_NOT_FOUND,
                         "상품을 찾을 수 없습니다.", Map.of("productId", productId)));
-
-        discardOpenSessions(productId);
 
         // 시연에서는 저울 하드웨어 대신 사전 등록 무게를 조회해 쓴다 (D-10).
         // 추론과 별개 경로라 추론이 실패해도 이 값은 응답에 실린다.
@@ -74,28 +69,8 @@ public class MeasurementService {
         // mock 은 사진을 보지 않는다 — 어느 쪽이든 판단은 클라이언트가 한다.
         List<CameraImage> images = imageSource.load(product);
         InferenceResult result = inferenceClient.infer(product, images);
-        if (result.failed()) {
-            MeasurementSession session = sessionRepository.save(
-                    MeasurementSession.failed(product, measuredWeightKg));
-            return MeasurementResponse.failed(session, result.failReason());
-        }
 
-        // 축 규약(D-18): 높이는 그대로 두고 가로·세로만 긴 쪽이 width 가 되도록 정렬한다.
-        // 모델 출력이 규약을 벗어나도 저장 전 여기서 맞춘다 (docs/05 §3 추론 응답 계약).
-        boolean swap = result.widthCm().compareTo(result.lengthCm()) < 0;
-        BigDecimal widthCm = swap ? result.lengthCm() : result.widthCm();
-        BigDecimal lengthCm = swap ? result.widthCm() : result.lengthCm();
-        BigDecimal heightCm = result.heightCm();
-
-        List<String> gateFailReasons = gate.evaluate(widthCm, lengthCm, heightCm, result.confidence());
-
-        MeasurementSession session = sessionRepository.save(MeasurementSession.inferred(
-                product, widthCm, lengthCm, heightCm, measuredWeightKg,
-                result.confidence(), gateFailReasons.isEmpty(), gateFailReasons));
-
-        attachImages(session, images);
-
-        return MeasurementResponse.inferred(session, handlingDefaults(product));
+        return writer.save(productId, measuredWeightKg, images, result);
     }
 
     /**
@@ -181,33 +156,6 @@ public class MeasurementService {
     private record Dims(BigDecimal widthCm, BigDecimal lengthCm, BigDecimal heightCm) {
     }
 
-    /** 재촬영: 이전 세션은 폐기한다. 확정된 세션은 건드리지 않는다. */
-    private void discardOpenSessions(Long productId) {
-        sessionRepository.findByProductIdAndStatusIn(productId, OPEN_STATUSES)
-                .forEach(MeasurementSession::discard);
-    }
 
-    /**
-     * 카메라 3대분 이미지 경로를 붙인다. 1-6 제품 이미지 조회가 이 경로를 그대로 돌려준다.
-     *
-     * <p>추론에 쓴 사진이 있으면 그 조회 URL 을 기록한다. 없으면(mock 에 데모 이미지 없는 상품)
-     * 실제 파일 없이 경로 문자열만 남긴다 — 실물 촬영이 붙으면 저장 위치만 바뀐다.
-     */
-    private void attachImages(MeasurementSession session, List<CameraImage> images) {
-        if (!images.isEmpty()) {
-            images.forEach(image -> session.addImage(image.cameraNo(), image.url()));
-            return;
-        }
-        for (short cameraNo = 1; cameraNo <= MeasurementImageSource.CAMERA_COUNT; cameraNo++) {
-            session.addImage(cameraNo, "/files/m/%d-%d.jpg".formatted(session.getId(), cameraNo));
-        }
-    }
 
-    /** 분류별 취급속성 기본값. 행이 없는 분류는 전부 false 로 취급한다 (03 §2). */
-    private MeasurementResponse.HandlingDefaults handlingDefaults(Product product) {
-        return categoryAttributeMapRepository.findByMediumCategoryCode(product.mediumCategoryCode())
-                .map(map -> new MeasurementResponse.HandlingDefaults(
-                        map.isDefaultRefrigerate(), map.isDefaultFragile(), map.isDefaultIrregular()))
-                .orElse(NO_HANDLING_DEFAULTS);
-    }
 }
