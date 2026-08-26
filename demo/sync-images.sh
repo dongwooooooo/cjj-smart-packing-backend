@@ -10,6 +10,12 @@
 # {gtin}/cam1.jpg, cam2.jpg, cam3.jpg 로 두고 실행한다.
 set -euo pipefail
 
+# macOS 는 bash 를 실행할 때 DYLD_* 환경변수를 지운다(SIP). homebrew python 을 쓰는
+# aws CLI 는 그러면 expat 을 못 찾고 죽으므로 여기서 다시 넣는다. 리눅스에서는 무해하다.
+if [ -d /opt/homebrew/opt/expat/lib ]; then
+  export DYLD_LIBRARY_PATH="/opt/homebrew/opt/expat/lib:${DYLD_LIBRARY_PATH:-}"
+fi
+
 BUCKET="${STORAGE_BUCKET:?STORAGE_BUCKET 을 지정하세요}"
 SRC="${1:-demo/data/images}"
 REGION="${STORAGE_AWS_REGION:-ap-northeast-2}"
