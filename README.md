@@ -17,7 +17,7 @@
 
 ```bash
 cp .env.example .env        # 기본값 그대로 동작
-docker compose up --build   # db + backend
+docker compose up --build   # db(override) + backend
 ```
 
 | 주소 | 내용 |
@@ -63,6 +63,20 @@ src/main/resources/db/migration/
 
 - 스키마 변경은 Flyway 마이그레이션 추가로만 하고, P3 리뷰 후 병합한다 (docs/05 §3).
 - 적용된 마이그레이션 파일을 수정했다면 `docker compose down -v`로 DB를 초기화해야 한다 (Flyway 체크섬 검증).
+
+## RDS 로 붙이기 (EC2)
+
+`docker-compose.yml`은 backend만 정의하고, 로컬 db는 `docker-compose.override.yml`에 있다(compose가 자동으로 합침). RDS를 쓰는 서버는 `.env`에 아래를 두면 override가 빠지고 backend가 RDS로 붙는다. 배포 스크립트 명령(`docker compose up -d --build`)은 그대로다.
+
+```
+COMPOSE_FILE=docker-compose.yml
+POSTGRES_HOST=<RDS 엔드포인트>
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=<마스터 비밀번호>
+POSTGRES_DB=postgres
+```
+
+Flyway가 첫 기동에서 V1~V4를 RDS에 적용한다. RDS 보안 그룹은 5432를 EC2 보안 그룹에서만 허용한다.
 
 ## 도메인 커스텀 에러 던지기
 

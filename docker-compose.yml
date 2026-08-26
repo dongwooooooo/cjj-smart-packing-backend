@@ -1,33 +1,18 @@
-# backend 단독 기동용 compose (db + backend).
+# backend 기동용 compose.
+#
+# 이 파일은 backend 만 정의한다. 로컬 개발용 db 는 docker-compose.override.yml 에 있고,
+# compose 가 그 파일을 자동으로 합쳐 읽으므로 로컬에서는 지금까지처럼 `docker compose up` 이면 된다.
+# EC2 처럼 RDS 를 쓰는 환경은 .env 에 `COMPOSE_FILE=docker-compose.yml` 을 두어 override 를 끄고
+# POSTGRES_HOST 에 RDS 엔드포인트를 넣는다 (docs/06 §RDS).
 # 프론트 포함 전체 스택 구성은 docs/06-docker-setup.md 참고.
 services:
-  db:
-    image: postgres:18.6
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-app}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
-      POSTGRES_DB: ${POSTGRES_DB:-app}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      # postgres:18 이미지부터 데이터 경로가 바뀌어 /var/lib/postgresql 에 마운트해야 한다
-      # (data 하위에 마운트하면 기동 실패 후 재시작 루프)
-      - pgdata:/var/lib/postgresql
-    healthcheck:
-      # 백엔드가 Flyway 를 돌리려면 DB 가 접속을 받을 준비가 되어야 한다
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   backend:
     build: .
     restart: unless-stopped
     environment:
-      # 컨테이너 간에는 서비스 이름이 곧 호스트명이다 (localhost 아님)
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
+      # 로컬은 override 의 db 서비스 이름, RDS 는 엔드포인트
+      POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_USER: ${POSTGRES_USER:-app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
       POSTGRES_DB: ${POSTGRES_DB:-app}
@@ -37,9 +22,3 @@ services:
       INFERENCE_TIMEOUT_SECONDS: ${INFERENCE_TIMEOUT_SECONDS:-8}
     ports:
       - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-
-volumes:
-  pgdata:
