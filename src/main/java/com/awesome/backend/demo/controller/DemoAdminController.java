@@ -2,6 +2,7 @@ package com.awesome.backend.demo.controller;
 
 import com.awesome.backend.demo.service.DemoAutoFeeder;
 import com.awesome.backend.demo.service.DemoNextResult;
+import com.awesome.backend.demo.service.DemoInferenceWarmup;
 import com.awesome.backend.demo.service.DemoOrderFeeder;
 import com.awesome.backend.demo.service.DemoResetService;
 import com.awesome.backend.demo.service.DemoResetSummary;
@@ -24,12 +25,15 @@ public class DemoAdminController {
     private final DemoResetService demoResetService;
     private final DemoOrderFeeder demoOrderFeeder;
     private final DemoAutoFeeder demoAutoFeeder;
+    private final DemoInferenceWarmup warmup;
 
     public DemoAdminController(DemoResetService demoResetService, DemoOrderFeeder demoOrderFeeder,
-                               DemoAutoFeeder demoAutoFeeder) {
+                               DemoAutoFeeder demoAutoFeeder,
+                               DemoInferenceWarmup warmup) {
         this.demoResetService = demoResetService;
         this.demoOrderFeeder = demoOrderFeeder;
         this.demoAutoFeeder = demoAutoFeeder;
+        this.warmup = warmup;
     }
 
     @Operation(summary = "시연 리셋",
@@ -39,7 +43,12 @@ public class DemoAdminController {
                     + "몇 번을 눌러도 같은 상태가 된다.")
     @PostMapping("/reset")
     public DemoResetSummary reset() {
-        return demoResetService.reset();
+        DemoResetSummary summary = demoResetService.reset();
+        // 워밍은 리셋 트랜잭션 밖에서 — Lambda 콜드 스타트가 10초라 안에서 부르면
+        // 그동안 DB 커넥션을 잡는다. 실패해도 리셋은 성공이다.
+        return warmup.warmUp()
+                .map(summary::withExtraSummaryLine)
+                .orElse(summary);
     }
 
     @Operation(summary = "시연 상태 조회",
