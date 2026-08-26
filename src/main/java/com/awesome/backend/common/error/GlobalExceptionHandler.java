@@ -5,6 +5,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -39,6 +40,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleRouteNotFound(Exception e) {
         return ResponseEntity.status(ErrorCode.ROUTE_NOT_FOUND.status())
                 .body(ErrorResponse.of(ErrorCode.ROUTE_NOT_FOUND, "요청한 경로를 찾을 수 없습니다."));
+    }
+
+    // 경로는 있는데 메서드가 다른 요청(POST 전용에 GET 등). 위와 같은 이유로 여기서 끊지 않으면
+    // catch-all 이 삼켜 500 이 된다 — 호출자는 경로가 틀린 줄 알고 엉뚱한 곳을 찾게 된다.
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException e) {
+        return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.status())
+                .body(ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED,
+                        "이 경로에서 지원하지 않는 요청 방식입니다.",
+                        Map.of("method", String.valueOf(e.getMethod()),
+                                "supported", String.valueOf(e.getSupportedHttpMethods()))));
     }
 
     @ExceptionHandler(Exception.class)
