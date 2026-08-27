@@ -16,6 +16,7 @@ develop push → build-push: Gradle·이미지 빌드 → ECR cj-ai-backend:{커
 - **로컬 개발은 그대로**: `docker-compose.override.yml` 이 `build: .` 로 덮어써서 소스에서 굽는다. EC2 는 `.env` 의 `COMPOSE_FILE=docker-compose.yml` 로 override 를 빼므로 ECR 이미지를 쓴다
 - **권한**: CI 는 OIDC 역할(`github-actions-logistics-dimension`)로 push, 인스턴스는 인스턴스 프로파일의 `ecr-pull-backend` 정책으로 pull. 저장된 자격 증명 없음
 - 인스턴스가 이미지를 못 받으면(권한·태그 오타) 컨테이너는 이전 상태 그대로다
+- **인스턴스에 AWS CLI 를 요구하지 않는다.** ECR 로그인 토큰은 CI 가 자기 OIDC 자격으로 받아 0600 파일로 넘긴다(12시간 만료, 배포가 끝나면 파일 삭제). 첫 전환 때 `aws: command not found` 로 배포가 실패해 이렇게 바꿨다
 
 
 ## 대상

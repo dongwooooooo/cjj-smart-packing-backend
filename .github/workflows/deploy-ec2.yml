@@ -116,9 +116,13 @@ jobs:
           echo "배포 대상: ${INSTANCE_ID} (${AWS_REGION}), ref ${GIT_REF}, 이미지 ${IMAGE_TAG}"
 
       # 레지스트리 주소를 얻기 위한 로그인. 이미지를 실제로 받는 건 인스턴스다.
+      # mask-password: false 로 두면 docker_password_* 출력을 다음 스텝에서 쓸 수 있다.
+      # 값은 계속 로그에서 마스킹된다.
       - name: Resolve ECR registry
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'false'
 
       # A stopped instance, a missing instance profile, or an SSM agent that
       # never registered all show up the same way: the instance is simply not in
@@ -150,7 +154,7 @@ jobs:
           #!/usr/bin/env bash
           # Runs on the EC2 instance as the ubuntu user. Inputs arrive as
           # exported environment variables: REPO_SLUG, REPO_TOKEN, GIT_REF,
-          # HEALTH_TIMEOUT_SECONDS, AWS_REGION, ECR_REGISTRY, ECR_REPO, IMAGE_TAG.
+          # HEALTH_TIMEOUT_SECONDS, ECR_REGISTRY, ECR_REPO, IMAGE_TAG, ECR_PASSWORD.
           set -euo pipefail
 
           APP_DIR="$HOME/backend"
@@ -218,7 +222,9 @@ jobs:
           PREVIOUS_IMAGE="$(sudo docker inspect --format '{{.Config.Image}}' \
             "$(sudo docker compose ps -q backend 2>/dev/null)" 2>/dev/null || true)"
 
-          aws ecr get-login-password --region "$AWS_REGION" \
+          # 인스턴스에 AWS CLI 를 요구하지 않는다. 로그인 토큰은 CI 가 자기 자격으로
+          # 받아 넘긴다 — 12시간짜리라 이 배포에만 쓰이고, 인스턴스에 남는 것은 없다.
+          printf '%s' "$ECR_PASSWORD" \
             | sudo docker login --username AWS --password-stdin "$ECR_REGISTRY"
           sudo docker pull "$IMAGE"
           echo "이미지: ${IMAGE}"
@@ -264,6 +270,7 @@ jobs:
           GIT_REF: ${{ steps.target.outputs.git_ref }}
           IMAGE_TAG: ${{ steps.target.outputs.image_tag }}
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          ECR_PASSWORD: ${{ steps.ecr-login.outputs.docker_password_300390308149_dkr_ecr_ap_northeast_2_amazonaws_com }}
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
@@ -287,8 +294,8 @@ jobs:
               "export GIT_REF=" + shlex.quote(os.environ["GIT_REF"]),
               "export HEALTH_TIMEOUT_SECONDS="
               + shlex.quote(os.environ["HEALTH_TIMEOUT_SECONDS"]),
-              "export AWS_REGION=" + shlex.quote(os.environ["AWS_REGION"]),
               "export ECR_REGISTRY=" + shlex.quote(os.environ["ECR_REGISTRY"]),
+              "export ECR_PASSWORD=" + shlex.quote(os.environ["ECR_PASSWORD"]),
               "export ECR_REPO=" + shlex.quote(os.environ["ECR_REPO"]),
               "export IMAGE_TAG=" + shlex.quote(os.environ["IMAGE_TAG"]),
           ]
