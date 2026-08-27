@@ -45,12 +45,15 @@ class DemoSampleDataTest {
     private final Cartonizer cartonizer = new Cartonizer(new PackingEngine(3.0));
 
     @Test
-    void 두_풀에_상품이_고르게_들어_있다() {
+    void 두_풀에_시연할_만큼의_상품이_들어_있다() {
+        // 개수를 못박지 않는다 — 시연 상품은 사진 확보 여부에 따라 바뀐다. 대신 각 풀이
+        // 장면을 만들 수 있는 최소치를 넘는지 본다 (입고 3회전, 출고 합포장·분할·완충재).
         List<DemoProductSpec> products = loader.loadProducts(DATA_DIR);
 
-        assertThat(products).hasSize(16);
-        assertThat(products).filteredOn(p -> p.pool() == DemoProduct.Pool.INBOUND).hasSize(6);
-        assertThat(products).filteredOn(p -> p.pool() == DemoProduct.Pool.OUTBOUND).hasSize(10);
+        assertThat(products).filteredOn(p -> p.pool() == DemoProduct.Pool.INBOUND)
+                .hasSizeGreaterThanOrEqualTo(3);
+        assertThat(products).filteredOn(p -> p.pool() == DemoProduct.Pool.OUTBOUND)
+                .hasSizeGreaterThanOrEqualTo(5);
     }
 
     @Test
