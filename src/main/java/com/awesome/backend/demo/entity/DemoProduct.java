@@ -42,6 +42,10 @@ public class DemoProduct {
     @Column(name = "image_dir")
     private String imageDir;
 
+    /** 입고 시연에서 이 바코드를 내준 시각. 리셋이 비운다. */
+    @Column(name = "served_at")
+    private java.time.LocalDateTime servedAt;
+
     protected DemoProduct() {
     }
 
@@ -87,5 +91,20 @@ public class DemoProduct {
         this.gtLengthCm = gtLengthCm;
         this.gtHeightCm = gtHeightCm;
         this.imageDir = imageDir;
+        // 리셋은 시연을 처음 상태로 되돌린다 — 내준 바코드 표시도 함께 지운다.
+        this.servedAt = null;
+    }
+
+    public java.time.LocalDateTime servedAt() {
+        return servedAt;
+    }
+
+    /** 화면에 바코드를 내줬다고 표시한다. 같은 것을 두 번 주지 않기 위한 표시다. */
+    public void markServed() {
+        this.servedAt = java.time.LocalDateTime.now();
+    }
+
+    public void clearServed() {
+        this.servedAt = null;
     }
 }

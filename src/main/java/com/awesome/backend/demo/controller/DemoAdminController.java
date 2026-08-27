@@ -2,6 +2,7 @@ package com.awesome.backend.demo.controller;
 
 import com.awesome.backend.demo.service.DemoAutoFeeder;
 import com.awesome.backend.demo.service.DemoNextResult;
+import com.awesome.backend.demo.service.DemoBarcodeFeeder;
 import com.awesome.backend.demo.service.DemoInferenceWarmup;
 import com.awesome.backend.demo.service.DemoOrderFeeder;
 import com.awesome.backend.demo.service.DemoResetService;
@@ -26,14 +27,16 @@ public class DemoAdminController {
     private final DemoOrderFeeder demoOrderFeeder;
     private final DemoAutoFeeder demoAutoFeeder;
     private final DemoInferenceWarmup warmup;
+    private final DemoBarcodeFeeder barcodeFeeder;
 
     public DemoAdminController(DemoResetService demoResetService, DemoOrderFeeder demoOrderFeeder,
                                DemoAutoFeeder demoAutoFeeder,
-                               DemoInferenceWarmup warmup) {
+                               DemoInferenceWarmup warmup, DemoBarcodeFeeder barcodeFeeder) {
         this.demoResetService = demoResetService;
         this.demoOrderFeeder = demoOrderFeeder;
         this.demoAutoFeeder = demoAutoFeeder;
         this.warmup = warmup;
+        this.barcodeFeeder = barcodeFeeder;
     }
 
     @Operation(summary = "시연 리셋",
@@ -49,6 +52,17 @@ public class DemoAdminController {
         return warmup.warmUp()
                 .map(summary::withExtraSummaryLine)
                 .orElse(summary);
+    }
+
+    @Operation(summary = "다음 시연 바코드",
+            description = "입고 시연에서 다음에 스캔할 바코드를 하나 내준다. 시연장에 스캐너가 없어 "
+                    + "화면의 버튼이 이 API 로 바코드를 받아 스캔 칸을 채운다. 아직 치수가 확정되지 "
+                    + "않은 입고 풀 상품을 바코드 순으로 주며, 다 쓰면 204. 리셋하면 처음부터 다시 준다.")
+    @PostMapping("/inbound/next-barcode")
+    public ResponseEntity<DemoBarcodeFeeder.DemoBarcode> nextBarcode() {
+        return barcodeFeeder.next()
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @Operation(summary = "시연 상태 조회",
