@@ -2,6 +2,22 @@
 
 develop에 머지되면 GitHub Actions가 EC2 인스턴스의 백엔드를 새 코드로 다시 띄운다. 워크플로 파일은 `.github/workflows/deploy-ec2.yml` 하나다.
 
+## 이미지 파이프라인 (2026-08-27~)
+
+인스턴스는 더 이상 빌드하지 않는다. CI 가 이미지를 굽고, 배포는 그 태그를 받아 실행한다.
+
+```
+develop push → build-push: Gradle·이미지 빌드 → ECR cj-ai-backend:{커밋7자리}, :latest
+             → deploy-ec2(build-push 성공 시 자동): SSM → 인스턴스가 pull + compose up
+             → /actuator/health UP 확인. 실패하면 직전 이미지로 되돌린다
+```
+
+- **롤백**: deploy-ec2 를 수동 실행하고 `image_tag` 에 이전 커밋 7자리를 넣는다. 빌드가 없으니 수십 초
+- **로컬 개발은 그대로**: `docker-compose.override.yml` 이 `build: .` 로 덮어써서 소스에서 굽는다. EC2 는 `.env` 의 `COMPOSE_FILE=docker-compose.yml` 로 override 를 빼므로 ECR 이미지를 쓴다
+- **권한**: CI 는 OIDC 역할(`github-actions-logistics-dimension`)로 push, 인스턴스는 인스턴스 프로파일의 `ecr-pull-backend` 정책으로 pull. 저장된 자격 증명 없음
+- 인스턴스가 이미지를 못 받으면(권한·태그 오타) 컨테이너는 이전 상태 그대로다
+
+
 ## 대상
 
 | 항목 | 값 |
@@ -39,7 +55,7 @@ ref는 `origin/<ref>` → `<ref>` → `git fetch origin <ref>` 순으로 해석�
 
 명령 본문은 POSIX sh로 쓴다. SSM 에이전트가 스크립트를 `/bin/sh`로 넘기고 Ubuntu의 `/bin/sh`는 dash라, `set -o pipefail`이나 `[[ ]]` 같은 bash 문법은 이 층위에서 쓸 수 없다. bash가 필요한 인스턴스 스크립트는 `bash`로 따로 실행한다.
 
-`ssm wait command-executed`는 5초 간격 20회, 즉 100초까지만 기다리고 포기한다. Gradle 빌드가 그보다 오래 걸리므로 이 대기를 30분 상한의 루프 안에서 반복 호출한다.
+`ssm wait command-executed`는 5초 간격 20회, 즉 100초까지만 기다리고 포기한다. 이미지 pull 이 그보다 오래 걸릴 수 있어 이 대기를 30분 상한의 루프 안에서 반복 호출한다.
 
 ### 기본값
 
@@ -147,17 +163,17 @@ SSM 에이전트가 만드는 스크립트 파일(`/var/lib/amazon/ssm/` 아래)
 | 인스턴스 출력에 `detected dubious ownership` | 배포가 ubuntu 아닌 사용자로 돌았음 | `sudo -H -u ubuntu` 줄이 그대로인지 확인 |
 | `헬스체크가 300초 안에 UP 이 되지 않았습니다` | 백엔드 기동 실패 | 같은 출력에 붙는 `docker compose logs backend --tail 50`을 본다. Flyway 체크섬 오류·DB 접속 실패가 대부분 |
 | DB 접속 실패 (`password authentication failed`) | `.env`의 계정과 기존 `pgdata` 볼륨의 계정이 다름 | 인스턴스에서 `~/backend/.env` 확인. 백업 디렉터리(`~/backend.bak.*`)에 원본이 있다 |
-| `1800초 안에 끝나지 않았습니다` | 빌드가 상한을 넘김 | 커맨드는 인스턴스에서 계속 돌고 있을 수 있다. 콘솔 Run Command에서 상태 확인 후 `env.POLL_TIMEOUT_SECONDS` 조정 |
+| `1800초 안에 끝나지 않았습니다` | pull 이 상한을 넘김 | 커맨드는 인스턴스에서 계속 돌고 있을 수 있다. 콘솔 Run Command에서 상태 확인 후 `env.POLL_TIMEOUT_SECONDS` 조정 |
 | 잡은 성공인데 외부에서 응답이 없음 | 컨테이너는 떴으나 보안 그룹이 막음 | 인바운드 8000이 호출자 IP 대역에 열려 있는지 확인 |
 
-인스턴스 출력은 API가 24,000자에서 자른다. Gradle 빌드 로그가 길어 뒷부분이 잘리면 인스턴스에서 `cd ~/backend && sudo docker compose logs backend --tail 200`을 직접 본다.
+인스턴스 출력은 API가 24,000자에서 자른다. 로그가 길어 뒷부분이 잘리면 인스턴스에서 `cd ~/backend && sudo docker compose logs backend --tail 200`을 직접 본다.
 
 실행 요약(Summary)에 인스턴스 ID와 SSM 커맨드 ID가 남는다. 콘솔에서 같은 커맨드를 찾을 때 쓴다.
 
 ## 아직 안 한 것
 
-- **PR 검사** — develop 대상 PR에서 빌드·테스트를 돌리는 워크플로가 없다. 지금은 머지된 뒤 인스턴스에서 처음 빌드된다. 빌드가 깨진 커밋이 develop에 들어가면 배포 잡에서 발견된다.
-- **무중단 배포** — `compose up -d --build`는 빌드가 끝난 뒤 컨테이너를 갈아 끼운다. 그동안 짧게 끊긴다. 인스턴스 한 대에 컨테이너 한 벌이라 롤링 교체할 대상이 없다.
+- **PR 검사** — develop 대상 PR에서 빌드·테스트를 돌리는 워크플로가 없다. 빌드가 깨진 커밋이 develop 에 들어가면 build-push 잡에서 발견된다 — 인스턴스에는 이미지가 안 올라가므로 서버는 이전 이미지로 계속 돈다.
+- **무중단 배포** — `compose up -d` 가 컨테이너를 갈아 끼우는 동안 짧게 끊긴다. 인스턴스 한 대에 컨테이너 한 벌이라 롤링 교체할 대상이 없다.
 - **자동 롤백** — 배포가 실패하면 인스턴스는 새 코드를 받은 상태로 남는다. 되돌리려면 이전 커밋 SHA를 `ref`에 넣어 수동 실행한다.
 - **백업 디렉터리 정리** — `~/backend.bak.*`는 자동으로 지워지지 않는다. git 저장소가 아닌 상태에서만 만들어지므로 정상 운영에서는 첫 배포 때 한 번 생긴다. 내용을 확인한 뒤 손으로 지운다.
 - **다중 인스턴스** — 인스턴스 하나에만 보낸다. 늘리면 태그 기반 타깃(`--targets Key=tag:...`)과 순차 배포 비율(`--max-errors`, `--max-concurrency`)을 함께 정해야 한다.

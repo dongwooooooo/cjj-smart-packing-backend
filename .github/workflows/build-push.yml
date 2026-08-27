@@ -1,0 +1,121 @@
+# Builds the backend image in CI and pushes it to ECR. The instance no longer
+# builds anything — deploy-ec2 just pulls the tag this workflow produced.
+#
+# Why the build moved off the instance: `docker compose up --build` ran a Gradle
+# build inside the image on a m7i-flex.large, which took minutes and kept the
+# demo server busy. It also left no artifact to roll back to. An image tag per
+# commit gives both: seconds to deploy, and a previous tag to return to.
+#
+# Credentials: GitHub OIDC only, same role the sibling ai repo uses.
+name: build-push
+
+on:
+  push:
+    branches:
+      - develop
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'demo/**'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: '푸시할 이미지 태그. 비우면 커밋 short sha.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: build-push
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPO: cj-ai-backend
+
+jobs:
+  build-push:
+    name: build and push image
+    runs-on: ubuntu-latest
+    outputs:
+      image-uri: ${{ steps.meta.outputs.image_uri }}
+      image-tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # The CI role can push but not create repositories. Fail here with a
+      # readable message instead of a deep ECR error on the push step.
+      - name: Check that the repository exists
+        run: |
+          set -euo pipefail
+          if ! aws ecr describe-repositories \
+                 --region "$AWS_REGION" \
+                 --repository-names "$ECR_REPO" >/dev/null 2>&1; then
+            echo "::error::ECR 저장소 ${ECR_REPO} 가 없습니다. 먼저 만들어야 합니다 (docs/deploy.md)."
+            exit 1
+          fi
+
+      # The tag reaches the shell through env, never interpolated into the
+      # script body, and its shape is validated before it is used.
+      - name: Resolve image tag
+        id: meta
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          TAG_INPUT: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          TAG="${TAG_INPUT:-}"
+          if [ -z "$TAG" ]; then
+            TAG="${GITHUB_SHA::7}"
+          fi
+          if ! printf '%s' "$TAG" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'; then
+            echo "::error::이미지 태그 '${TAG}' 형식이 올바르지 않습니다."
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "image_uri=${REGISTRY}/${ECR_REPO}:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "이미지: ${REGISTRY}/${ECR_REPO}:${TAG}"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # linux/amd64 only — the deploy target is an x86 EC2 instance. Building
+      # for the runner's own platform would be wrong on an arm runner.
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          provenance: false
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ steps.meta.outputs.image_uri }}
+            ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:latest
+
+      - name: Summary
+        run: |
+          {
+            echo "### 이미지 push 완료"
+            echo ""
+            echo "- 이미지: \`${{ steps.meta.outputs.image_uri }}\`"
+            echo "- 커밋: \`${GITHUB_SHA}\`"
+            echo ""
+            echo "배포는 deploy-ec2 워크플로가 이어서 실행합니다."
+          } >> "$GITHUB_STEP_SUMMARY"
