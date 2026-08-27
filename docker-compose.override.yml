@@ -22,6 +22,9 @@ services:
       retries: 10
 
   backend:
+    # 로컬은 소스에서 직접 굽는다. 본 파일의 image 를 덮어쓴다.
+    build: .
+    image: cj-ai-backend:local
     environment:
       # 컨테이너 간에는 서비스 이름이 곧 호스트명이다 (localhost 아님)
       POSTGRES_HOST: db
