@@ -26,7 +26,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>코리안넷에서 받아 저장소에 올려 둔 사진을 쓴다. 사진이 없는 상품은 placeholder 로 남는다 —
  * 화면은 "no-image" 를 보여주면 되고, 그것 때문에 스캔이 실패하지는 않는다.
  */
-@SpringBootTest
+/*
+ * 이미지 보관소를 테스트 전용 디렉토리로 돌린다. 기본값은 demo/data 라서 그대로 두면 이 테스트가
+ * 쓰는 가짜 사진이 실제 시연 사진을 덮어쓴다 — 3 바이트짜리로 잘린 사진이 저장소에 들어가
+ * 병합된 적이 있고, 원인이 이것이었다.
+ */
+@SpringBootTest(properties = "storage.local-base-path=build/test-image-store")
 @Testcontainers
 class MasterImageIT {
 
