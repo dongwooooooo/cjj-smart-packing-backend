@@ -15,6 +15,18 @@ docker compose up -d --build          # 첫 실행은 백엔드 빌드까지 해
 curl -s localhost:8000/actuator/health # {"status":"UP"} 이면 준비 완료
 ```
 
+시연 서버는 **헬스체크를 뺀 모든 호출에 열쇠를 요구한다**(D-26). 헤더 이름은 `X-Demo-Key` 다.
+붙이지 않으면 401 이 돌아오고, 응답은 어느 경로였는지도 알려주지 않는다 — 시연 중에 만나면
+원인을 찾는 데 시간이 걸리므로 아래 예시를 그대로 쓴다. 값은 명령줄에 직접 적지 말고 서버
+환경 설정(`.env`)에서 읽어 셸에 넣는다.
+
+```bash
+export DEMO_API_KEY=$(grep '^DEMO_API_KEY=' .env | cut -d= -f2-)
+```
+
+로컬은 `.env` 에 `DEMO_API_KEY` 가 없어 검사가 꺼져 있다 — 헤더 없이 그대로 된다. 화면은
+Vercel 서버 쪽에서 헤더를 붙이므로 시연 서버에서도 그대로 동작한다.
+
 방금 다시 빌드했다면 헬스가 200이어도 **이전 컨테이너가 답한 것일 수 있다.**
 `docker compose ps`로 backend가 방금 올라온 것인지 확인하고 넘어간다.
 
@@ -24,16 +36,16 @@ curl -s localhost:8000/actuator/health # {"status":"UP"} 이면 준비 완료
 admin 그룹에서 눌러도 되고 curl로 해도 된다.
 
 ```bash
-curl -s -X POST localhost:8000/api/v1/admin/demo/reset | python3 -m json.tool
+curl -s -X POST -H "X-Demo-Key: $DEMO_API_KEY" localhost:8000/api/v1/admin/demo/reset | python3 -m json.tool
 ```
 
 ```json
 {
-  "products": { "inbound": 3, "outbound": 3 },
-  "queuedBatches": 3,
-  "totes": { "idle": 10, "assigned": 0 },
+  "products": { "inbound": 3, "outbound": 4 },
+  "queuedBatches": 8,
+  "totes": { "idle": 40, "assigned": 0 },
   "boxTypes": { "count": 5, "stockQty": 100 },
-  "summary": "상품 6종 — 입고 풀 3(치수 미확정) / 출고 풀 3(치수 확정, 재고 세팅)\n대기 배치 3개 중 0개 투입\n토트 10/10 유휴\n박스 5종 각 100개\n접수된 주문 0건, 배송단위 0개"
+  "summary": "상품 7종 — 입고 풀 3(치수 미확정) / 출고 풀 4(치수 확정, 재고 세팅)\n대기 배치 8개 중 0개 투입\n토트 40/40 유휴\n박스 5종 각 100개\n접수된 주문 0건, 배송단위 0개"
 }
 ```
 
@@ -45,9 +57,9 @@ curl -s -X POST localhost:8000/api/v1/admin/demo/reset | python3 -m json.tool
 | --- | --- |
 | 지난 시연 잔여물 | 주문·배송단위·토트 할당·측정 세션·재고 원장·대기열을 전부 삭제 |
 | 기준정보 | 분류·지역·라인·박스·토트 행은 유지. 토트는 유휴로, 박스 재고는 100개로 복원 |
-| 입고 풀 상품 3종 | 치수 미확정·재고 0 — 입고 시연에서 스캔·촬영·확정할 대상 |
-| 출고 풀 상품 3종 | 치수 확정·재고 채움 — 출고지시가 부를 대상 |
-| 출고지시 | 배치 3개가 대기열에 쌓임 (아직 접수 전) |
+| 입고 풀 상품 3종 | 치수 미확정·재고 0 — 입고 시연에서 스캔·촬영·확정할 대상 (누들핏·오뜨 치즈·테라) |
+| 출고 풀 상품 4종 | 치수 확정·재고 채움 — 출고지시가 부를 대상 (고추참치 60·사골곰탕 40·국간장 25·냄비 1) |
+| 출고지시 | 배치 8개가 대기열에 쌓임 (아직 접수 전) |
 
 몇 번을 눌러도 같은 상태가 된다. 리허설을 반복해도 매번 같은 화면에서 시작한다.
 
@@ -62,7 +74,7 @@ curl -s -X POST localhost:8000/api/v1/admin/demo/reset | python3 -m json.tool
 시연 도중 언제든 확인할 수 있다.
 
 ```bash
-curl -s localhost:8000/api/v1/admin/demo/status | python3 -m json.tool
+curl -s -H "X-Demo-Key: $DEMO_API_KEY" localhost:8000/api/v1/admin/demo/status | python3 -m json.tool
 ```
 
 풀별 상품(치수 상태·재고), 대기열 배치와 투입 여부, 토트·박스 현황, 접수된 주문·배송단위
@@ -73,7 +85,7 @@ curl -s localhost:8000/api/v1/admin/demo/status | python3 -m json.tool
 대기열에서 배치를 하나씩 꺼내 접수한다. 누를 때마다 화면이 한 단계씩 채워진다.
 
 ```bash
-curl -s -X POST localhost:8000/api/v1/admin/demo/orders/next | python3 -m json.tool
+curl -s -X POST -H "X-Demo-Key: $DEMO_API_KEY" localhost:8000/api/v1/admin/demo/orders/next | python3 -m json.tool
 ```
 
 ```json
@@ -85,15 +97,17 @@ curl -s -X POST localhost:8000/api/v1/admin/demo/orders/next | python3 -m json.t
 
 `seq`가 방금 나간 배치, `remaining`이 남은 배치 수다. 대기열이 비면 204(내용 없음)가 온다.
 
-배치 3개를 순서대로 넣으면 케이스가 차례로 나온다.
+앞 세 배치를 순서대로 넣으면 케이스가 차례로 나온다. 뒤 배치(4~8)는 라인 대시보드를
+채우는 몫이라 구성이 정해져 있지 않다.
 
 | 배치 | 담긴 것 | 보여주는 것 |
 | --- | --- | --- |
-| 1 | 칩 2 + 라면 1 | 여러 상품이 한 박스로 합포장 |
-| 2 | 라면 8 | 한 박스에 안 들어가 배송단위 2개로 분할 |
-| 3 | 주스 2 + 칩 1 | 파손주의 상품 포함 → 완충재 권유 |
+| 1 | 고추참치 3 + 사골곰탕 1 | 여러 상품이 한 박스(C호)로 합포장 |
+| 2 | 사골곰탕 10 + 국간장 6 | 한 박스에 안 들어가 배송단위 2개로 분할(E호·C호) |
+| 3 | 국간장 2 + 고추참치 2 | 파손주의 상품 포함 → 완충재 권유 |
 
 배치마다 보여줄 장면이 하나씩이라, 투입할 때마다 화면에서 달라지는 게 뚜렷하다.
+주문은 전부 서울이라 배송단위가 모두 LINE A 에 붙는다 — 시연에서 라인 한 곳만 본다.
 시연 시나리오에는 거부되는 주문이 없다 — 부분 성공(일부 주문만 거부되고 나머지는 접수)은
 기능과 테스트에는 있지만 시연 화면으로는 다루지 않는다.
 
@@ -102,13 +116,13 @@ curl -s -X POST localhost:8000/api/v1/admin/demo/orders/next | python3 -m json.t
 발표하면서 직접 누르기 어려우면 자동 투입을 켠다.
 
 ```bash
-curl -s -X POST "localhost:8000/api/v1/admin/demo/orders/auto?intervalSeconds=20"
+curl -s -X POST -H "X-Demo-Key: $DEMO_API_KEY" "localhost:8000/api/v1/admin/demo/orders/auto?intervalSeconds=20"
 ```
 
 20초마다 배치가 하나씩 들어간다. 간격은 1~600초. 대기열이 비면 스스로 멈춘다.
 
 ```bash
-curl -s -X DELETE localhost:8000/api/v1/admin/demo/orders/auto   # 정지
+curl -s -X DELETE -H "X-Demo-Key: $DEMO_API_KEY" localhost:8000/api/v1/admin/demo/orders/auto   # 정지
 ```
 
 이미 돌고 있는데 다시 시작하면 409다. 간격을 바꾸려면 정지하고 다시 시작한다.
@@ -133,7 +147,8 @@ select o.receipt_no, o.status as 주문상태, l.name as 라인, s.seq_no,
  order by o.receipt_no, s.seq_no;"
 ```
 
-- **라인**: 배송지역으로 정해진다. 서울→LINE A, 경기→LINE B, 부산→LINE C
+- **라인**: 배송지역으로 정해진다. 서울→LINE A, 경기→LINE B, 부산→LINE C.
+  시연 주문은 전부 서울이라 LINE A 에만 쌓인다
 - **한 주문이 두 줄**: 배송단위가 나뉜 경우. 각각 다른 박스와 다른 토트를 받는다
 - **완충재 t**: 파손주의 상품이 들어간 배송단위
 - **상태**: 주문 `ALLOCATED`, 배송단위 `TOTE_ASSIGNED` — 토트까지 붙어 작업자에게
@@ -146,7 +161,7 @@ docker compose exec -T db psql -U app -d app -c \
   "select status, count(*) from tote group by status order by status;"
 ```
 
-토트는 10개다. 배치가 토트보다 많은 배송단위를 만들면 그 배치 전체가 되돌아가고 500이
+토트는 40개다. 배치가 토트보다 많은 배송단위를 만들면 그 배치 전체가 되돌아가고 500이
 난다 — 일부만 접수된 채로 남기지 않는다.
 
 ## 5. 다시 처음부터
@@ -161,7 +176,7 @@ docker compose exec -T db psql -U app -d app -c \
 지금 붙일 수 있는 통로는 라인별 배송단위 목록 하나다.
 
 ```bash
-curl -s localhost:8000/api/v1/lines/1/shipments | python3 -m json.tool
+curl -s -H "X-Demo-Key: $DEMO_API_KEY" localhost:8000/api/v1/lines/1/shipments | python3 -m json.tool
 ```
 
 ```json

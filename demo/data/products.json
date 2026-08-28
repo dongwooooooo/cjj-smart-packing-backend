@@ -1,74 +1,5 @@
 [
   {
-    "gtin": "8801056177645",
-    "name": "롯데칠성음료(주) 칠성사이다 제로 355ml",
-    "mediumCategoryCode": "0117",
-    "pool": "OUTBOUND",
-    "dims": {
-      "widthCm": 6.5,
-      "lengthCm": 6.4,
-      "heightCm": 12.5
-    },
-    "weightKg": 0.372,
-    "flags": {
-      "refrigerate": false,
-      "fragile": true,
-      "irregular": false
-    },
-    "stockQty": 50,
-    "images": [
-      "images/8801056177645/cam1.jpg",
-      "images/8801056177645/cam2.jpg",
-      "images/8801056177645/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8801097168800",
-    "name": "동아오츠카(주) 데미소다 청포도 250ml",
-    "mediumCategoryCode": "0117",
-    "pool": "OUTBOUND",
-    "dims": {
-      "widthCm": 5.1,
-      "lengthCm": 5.1,
-      "heightCm": 13.4
-    },
-    "weightKg": 0.268,
-    "flags": {
-      "refrigerate": false,
-      "fragile": true,
-      "irregular": false
-    },
-    "stockQty": 50,
-    "images": [
-      "images/8801097168800/cam1.jpg",
-      "images/8801097168800/cam2.jpg",
-      "images/8801097168800/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8801094432614",
-    "name": "한국코카콜라(유) 조지아 크래프트 디카페인블랙 470ml",
-    "mediumCategoryCode": "0121",
-    "pool": "OUTBOUND",
-    "dims": {
-      "widthCm": 6.9,
-      "lengthCm": 6.8,
-      "heightCm": 18.4
-    },
-    "weightKg": 0.496,
-    "flags": {
-      "refrigerate": false,
-      "fragile": true,
-      "irregular": false
-    },
-    "stockQty": 40,
-    "images": [
-      "images/8801094432614/cam1.jpg",
-      "images/8801094432614/cam2.jpg",
-      "images/8801094432614/cam3.jpg"
-    ]
-  },
-  {
     "gtin": "8801047123729",
     "name": "동원 고추참치 90g",
     "mediumCategoryCode": "0106",
@@ -81,7 +12,7 @@
     "weightKg": 0.126,
     "flags": {
       "refrigerate": false,
-      "fragile": true,
+      "fragile": false,
       "irregular": false
     },
     "stockQty": 60,
@@ -89,52 +20,6 @@
       "images/8801047123729/cam1.jpg",
       "images/8801047123729/cam2.jpg",
       "images/8801047123729/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8801047150022",
-    "name": "동원 JUST No Sugar Added 황도 2절 400g",
-    "mediumCategoryCode": "0106",
-    "pool": "OUTBOUND",
-    "dims": {
-      "widthCm": 7.3,
-      "lengthCm": 7.3,
-      "heightCm": 11.3
-    },
-    "weightKg": 0.498,
-    "flags": {
-      "refrigerate": false,
-      "fragile": true,
-      "irregular": false
-    },
-    "stockQty": 40,
-    "images": [
-      "images/8801047150022/cam1.jpg",
-      "images/8801047150022/cam2.jpg",
-      "images/8801047150022/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8801007867045",
-    "name": "햇반컵반 스팸김치덮밥 251g",
-    "mediumCategoryCode": "0112",
-    "pool": "OUTBOUND",
-    "dims": {
-      "widthCm": 13.5,
-      "lengthCm": 13.5,
-      "heightCm": 9.9
-    },
-    "weightKg": 0.3,
-    "flags": {
-      "refrigerate": false,
-      "fragile": false,
-      "irregular": false
-    },
-    "stockQty": 40,
-    "images": [
-      "images/8801007867045/cam1.jpg",
-      "images/8801007867045/cam2.jpg",
-      "images/8801007867045/cam3.jpg"
     ]
   },
   {
@@ -153,7 +38,7 @@
       "fragile": false,
       "irregular": false
     },
-    "stockQty": 30,
+    "stockQty": 40,
     "images": [
       "images/8801007526492/cam1.jpg",
       "images/8801007526492/cam2.jpg",
@@ -161,49 +46,26 @@
     ]
   },
   {
-    "gtin": "8801019206351",
-    "name": "해태제과식품(주) 얼려먹는 초코만들기 세가지 맛",
-    "mediumCategoryCode": "0116",
+    "gtin": "8801005109000",
+    "name": "샘표 국간장 860ml",
+    "mediumCategoryCode": "0101",
     "pool": "OUTBOUND",
     "dims": {
-      "widthCm": 15.4,
-      "lengthCm": 12.7,
-      "heightCm": 3.7
+      "widthCm": 7.8,
+      "lengthCm": 7.7,
+      "heightCm": 25.2
     },
-    "weightKg": 0.066,
+    "weightKg": 1.07,
     "flags": {
       "refrigerate": false,
-      "fragile": false,
+      "fragile": true,
       "irregular": false
     },
-    "stockQty": 30,
+    "stockQty": 25,
     "images": [
-      "images/8801019206351/cam1.jpg",
-      "images/8801019206351/cam2.jpg",
-      "images/8801019206351/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8806325610724",
-    "name": "식물나라 비누 히노끼 퓨어바 100g x 4입",
-    "mediumCategoryCode": "0320",
-    "pool": "OUTBOUND",
-    "dims": {
-      "widthCm": 18.7,
-      "lengthCm": 12.7,
-      "heightCm": 3.7
-    },
-    "weightKg": 0.428,
-    "flags": {
-      "refrigerate": false,
-      "fragile": false,
-      "irregular": false
-    },
-    "stockQty": 30,
-    "images": [
-      "images/8806325610724/cam1.jpg",
-      "images/8806325610724/cam2.jpg",
-      "images/8806325610724/cam3.jpg"
+      "images/8801005109000/cam1.jpg",
+      "images/8801005109000/cam2.jpg",
+      "images/8801005109000/cam3.jpg"
     ]
   },
   {
@@ -222,57 +84,11 @@
       "fragile": false,
       "irregular": false
     },
-    "stockQty": 15,
+    "stockQty": 1,
     "images": [
       "images/8806179696691/cam1.jpg",
       "images/8806179696691/cam2.jpg",
       "images/8806179696691/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8801119730015",
-    "name": "하이트진로(주) 테라 1600mL x 1페트",
-    "mediumCategoryCode": "0123",
-    "pool": "INBOUND",
-    "dims": {
-      "widthCm": 10.3,
-      "lengthCm": 10.2,
-      "heightCm": 31.8
-    },
-    "weightKg": 1.662,
-    "flags": {
-      "refrigerate": false,
-      "fragile": true,
-      "irregular": false
-    },
-    "stockQty": 0,
-    "images": [
-      "images/8801119730015/cam1.jpg",
-      "images/8801119730015/cam2.jpg",
-      "images/8801119730015/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8801005109000",
-    "name": "샘표 국간장 860ml",
-    "mediumCategoryCode": "0101",
-    "pool": "INBOUND",
-    "dims": {
-      "widthCm": 7.8,
-      "lengthCm": 7.7,
-      "heightCm": 25.2
-    },
-    "weightKg": 1.07,
-    "flags": {
-      "refrigerate": false,
-      "fragile": true,
-      "irregular": false
-    },
-    "stockQty": 0,
-    "images": [
-      "images/8801005109000/cam1.jpg",
-      "images/8801005109000/cam2.jpg",
-      "images/8801005109000/cam3.jpg"
     ]
   },
   {
@@ -319,6 +135,29 @@
       "images/8801117548612/cam1.jpg",
       "images/8801117548612/cam2.jpg",
       "images/8801117548612/cam3.jpg"
+    ]
+  },
+  {
+    "gtin": "8801119730015",
+    "name": "하이트진로(주) 테라 1600mL x 1페트",
+    "mediumCategoryCode": "0123",
+    "pool": "INBOUND",
+    "dims": {
+      "widthCm": 10.3,
+      "lengthCm": 10.2,
+      "heightCm": 31.8
+    },
+    "weightKg": 1.662,
+    "flags": {
+      "refrigerate": false,
+      "fragile": true,
+      "irregular": false
+    },
+    "stockQty": 0,
+    "images": [
+      "images/8801119730015/cam1.jpg",
+      "images/8801119730015/cam2.jpg",
+      "images/8801119730015/cam3.jpg"
     ]
   }
 ]

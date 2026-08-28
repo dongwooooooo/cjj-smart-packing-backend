@@ -133,7 +133,7 @@ class DemoResetSequenceIT {
         mvc.perform(post(RESET)).andExpect(status().isInternalServerError());
 
         assertThat(orderRepository.count()).isEqualTo(ordersBefore);
-        assertThat(queueRepository.count()).isEqualTo(18);
+        assertThat(queueRepository.count()).isEqualTo(batchesInFile());
     }
 
     @Test
@@ -172,5 +172,16 @@ class DemoResetSequenceIT {
 
     private int count(String sql) {
         return jdbcTemplate.queryForObject(sql, Integer.class);
+    }
+
+    /** 배치 수는 demo/data/orders.json 이 정한다. */
+    private static long batchesInFile() {
+        try {
+            String json = java.nio.file.Files.readString(
+                    java.nio.file.Path.of("demo/data/orders.json"));
+            return java.util.regex.Pattern.compile("\"batchId\"").matcher(json).results().count();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("orders.json 을 읽지 못했다", e);
+        }
     }
 }
