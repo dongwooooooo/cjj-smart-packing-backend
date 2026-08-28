@@ -133,7 +133,7 @@ select o.receipt_no, o.status as 주문상태, l.name as 라인, s.seq_no,
  order by o.receipt_no, s.seq_no;"
 ```
 
-- **라인**: 배송지역으로 정해진다. 서울→1라인, 경기→2라인, 부산→3라인
+- **라인**: 배송지역으로 정해진다. 서울→LINE A, 경기→LINE B, 부산→LINE C
 - **한 주문이 두 줄**: 배송단위가 나뉜 경우. 각각 다른 박스와 다른 토트를 받는다
 - **완충재 t**: 파손주의 상품이 들어간 배송단위
 - **상태**: 주문 `ALLOCATED`, 배송단위 `TOTE_ASSIGNED` — 토트까지 붙어 작업자에게
