@@ -29,6 +29,9 @@ packing:
   filler-thickness-cm: 1.0
 
 demo:
+  # API 앞단 열쇠 (D-26). 비우면 검사하지 않는다 — 로컬·테스트는 그대로 돈다.
+  # 시연 서버는 인터넷에 열려 있고 백엔드에 로그인이 없어, 화면(Vercel)만 이 값을 쥔다.
+  api-key: ${DEMO_API_KEY:}
   # 시연 데이터 위치. 상대 경로라 로컬 실행과 컨테이너가 같은 값을 쓴다
   data-dir: ./demo/data
   box-stock-qty: 100
