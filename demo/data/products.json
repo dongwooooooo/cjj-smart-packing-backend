@@ -12,7 +12,7 @@
     "weightKg": 0.126,
     "flags": {
       "refrigerate": false,
-      "fragile": true,
+      "fragile": false,
       "irregular": false
     },
     "stockQty": 60,
