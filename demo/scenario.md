@@ -8,6 +8,7 @@
 | 조작 | 확인 |
 | --- | --- |
 | `docker compose up -d` | health 200, `docker compose ps` 로 backend 기동 시각 확인 (구 컨테이너 응답 함정) |
+| 열쇠 준비 | 시연 서버는 헬스체크를 뺀 모든 호출에 `X-Demo-Key` 헤더를 요구한다. 없으면 401 (D-26, demo/README.md 1장) |
 | `POST /admin/demo/reset` | summary: 입고 풀 3 / 출고 풀 4 / 대기 배치 8 / 토트 40/40 / 박스 5종 각 100 |
 | `GET /admin/demo/status` | 위와 일치, 접수 주문 0 |
 

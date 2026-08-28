@@ -15,6 +15,18 @@ docker compose up -d --build          # 첫 실행은 백엔드 빌드까지 해
 curl -s localhost:8000/actuator/health # {"status":"UP"} 이면 준비 완료
 ```
 
+시연 서버는 **헬스체크를 뺀 모든 호출에 열쇠를 요구한다**(D-26). 헤더 이름은 `X-Demo-Key` 다.
+붙이지 않으면 401 이 돌아오고, 응답은 어느 경로였는지도 알려주지 않는다 — 시연 중에 만나면
+원인을 찾는 데 시간이 걸리므로 아래 예시를 그대로 쓴다. 값은 명령줄에 직접 적지 말고 서버
+환경 설정(`.env`)에서 읽어 셸에 넣는다.
+
+```bash
+export DEMO_API_KEY=$(grep '^DEMO_API_KEY=' .env | cut -d= -f2-)
+```
+
+로컬은 `.env` 에 `DEMO_API_KEY` 가 없어 검사가 꺼져 있다 — 헤더 없이 그대로 된다. 화면은
+Vercel 서버 쪽에서 헤더를 붙이므로 시연 서버에서도 그대로 동작한다.
+
 방금 다시 빌드했다면 헬스가 200이어도 **이전 컨테이너가 답한 것일 수 있다.**
 `docker compose ps`로 backend가 방금 올라온 것인지 확인하고 넘어간다.
 
@@ -24,7 +36,7 @@ curl -s localhost:8000/actuator/health # {"status":"UP"} 이면 준비 완료
 admin 그룹에서 눌러도 되고 curl로 해도 된다.
 
 ```bash
-curl -s -X POST localhost:8000/api/v1/admin/demo/reset | python3 -m json.tool
+curl -s -X POST -H "X-Demo-Key: $DEMO_API_KEY" localhost:8000/api/v1/admin/demo/reset | python3 -m json.tool
 ```
 
 ```json
@@ -62,7 +74,7 @@ curl -s -X POST localhost:8000/api/v1/admin/demo/reset | python3 -m json.tool
 시연 도중 언제든 확인할 수 있다.
 
 ```bash
-curl -s localhost:8000/api/v1/admin/demo/status | python3 -m json.tool
+curl -s -H "X-Demo-Key: $DEMO_API_KEY" localhost:8000/api/v1/admin/demo/status | python3 -m json.tool
 ```
 
 풀별 상품(치수 상태·재고), 대기열 배치와 투입 여부, 토트·박스 현황, 접수된 주문·배송단위
@@ -73,7 +85,7 @@ curl -s localhost:8000/api/v1/admin/demo/status | python3 -m json.tool
 대기열에서 배치를 하나씩 꺼내 접수한다. 누를 때마다 화면이 한 단계씩 채워진다.
 
 ```bash
-curl -s -X POST localhost:8000/api/v1/admin/demo/orders/next | python3 -m json.tool
+curl -s -X POST -H "X-Demo-Key: $DEMO_API_KEY" localhost:8000/api/v1/admin/demo/orders/next | python3 -m json.tool
 ```
 
 ```json
@@ -104,13 +116,13 @@ curl -s -X POST localhost:8000/api/v1/admin/demo/orders/next | python3 -m json.t
 발표하면서 직접 누르기 어려우면 자동 투입을 켠다.
 
 ```bash
-curl -s -X POST "localhost:8000/api/v1/admin/demo/orders/auto?intervalSeconds=20"
+curl -s -X POST -H "X-Demo-Key: $DEMO_API_KEY" "localhost:8000/api/v1/admin/demo/orders/auto?intervalSeconds=20"
 ```
 
 20초마다 배치가 하나씩 들어간다. 간격은 1~600초. 대기열이 비면 스스로 멈춘다.
 
 ```bash
-curl -s -X DELETE localhost:8000/api/v1/admin/demo/orders/auto   # 정지
+curl -s -X DELETE -H "X-Demo-Key: $DEMO_API_KEY" localhost:8000/api/v1/admin/demo/orders/auto   # 정지
 ```
 
 이미 돌고 있는데 다시 시작하면 409다. 간격을 바꾸려면 정지하고 다시 시작한다.
@@ -164,7 +176,7 @@ docker compose exec -T db psql -U app -d app -c \
 지금 붙일 수 있는 통로는 라인별 배송단위 목록 하나다.
 
 ```bash
-curl -s localhost:8000/api/v1/lines/1/shipments | python3 -m json.tool
+curl -s -H "X-Demo-Key: $DEMO_API_KEY" localhost:8000/api/v1/lines/1/shipments | python3 -m json.tool
 ```
 
 ```json
