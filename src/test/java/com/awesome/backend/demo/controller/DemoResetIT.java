@@ -40,8 +40,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Transactional
 class DemoResetIT {
 
-    /** demo/data/orders.json 의 배치 수. 라인 대시보드를 채우려면 여러 개가 필요하다. */
-    private static final int BATCHES = 18;
+    /** 배치 수는 파일이 정한다 — 시연 구성이 바뀌어도 테스트가 따라 깨지지 않게 한다. */
+    private static final int BATCHES = (int) batchesInFile();
 
     /** V2 seed 10개 + V6 이 더한 30개. 접수가 주문마다 토트를 하나씩 잡는다. */
     private static final int TOTES = 40;
@@ -85,6 +85,17 @@ class DemoResetIT {
         }
     }
 
+    /** demo/data/orders.json 의 배치 수 — batchId 항목을 센다. */
+    private static long batchesInFile() {
+        try {
+            String json = java.nio.file.Files.readString(
+                    java.nio.file.Path.of("demo/data/orders.json"));
+            return java.util.regex.Pattern.compile("\"batchId\"").matcher(json).results().count();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("orders.json 을 읽지 못했다", e);
+        }
+    }
+
     private static long totalInFile() {
         return countInFile("INBOUND") + countInFile("OUTBOUND");
     }
@@ -120,7 +131,7 @@ class DemoResetIT {
         mvc.perform(post(RESET))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.products.inbound").value((int) countInFile("INBOUND")))
-                .andExpect(jsonPath("$.products.outbound").value(10))
+                .andExpect(jsonPath("$.products.outbound").value((int) countInFile("OUTBOUND")))
                 .andExpect(jsonPath("$.queuedBatches").value(BATCHES))
                 .andExpect(jsonPath("$.totes.idle").value(TOTES))
                 .andExpect(jsonPath("$.totes.assigned").value(0))
@@ -148,7 +159,7 @@ class DemoResetIT {
         reset();
 
         List<DemoProduct> outbound = demoProductRepository.findByPool(DemoProduct.Pool.OUTBOUND);
-        assertThat(outbound).hasSize(10);
+        assertThat(outbound).hasSize((int) countInFile("OUTBOUND"));
         for (DemoProduct demo : outbound) {
             Product product = productRepository.findByGtin(demo.gtin()).orElseThrow();
             assertThat(product.dimStatus()).isEqualTo(Product.DIM_STATUS_CONFIRMED);
@@ -163,7 +174,7 @@ class DemoResetIT {
 
         Integer ledgerRows = jdbcTemplate.queryForObject(
                 "select count(*) from inventory_tx", Integer.class);
-        assertThat(ledgerRows).isEqualTo(10);
+        assertThat(ledgerRows).isEqualTo((int) countInFile("OUTBOUND"));
     }
 
     @Test
@@ -211,7 +222,8 @@ class DemoResetIT {
         mvc.perform(get(STATUS))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.products[?(@.pool == 'INBOUND')].items.length()").value((int) countInFile("INBOUND")))
-                .andExpect(jsonPath("$.products[?(@.pool == 'OUTBOUND')].items.length()").value(10))
+                .andExpect(jsonPath("$.products[?(@.pool == 'OUTBOUND')].items.length()")
+                        .value((int) countInFile("OUTBOUND")))
                 .andExpect(jsonPath("$.batches.length()").value(BATCHES))
                 .andExpect(jsonPath("$.batches[0].seq").value(1))
                 .andExpect(jsonPath("$.batches[0].orderCount").value(1))

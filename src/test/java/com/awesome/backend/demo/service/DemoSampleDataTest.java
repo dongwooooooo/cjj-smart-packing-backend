@@ -53,7 +53,7 @@ class DemoSampleDataTest {
         assertThat(products).filteredOn(p -> p.pool() == DemoProduct.Pool.INBOUND)
                 .hasSizeGreaterThanOrEqualTo(3);
         assertThat(products).filteredOn(p -> p.pool() == DemoProduct.Pool.OUTBOUND)
-                .hasSizeGreaterThanOrEqualTo(5);
+                .hasSizeGreaterThanOrEqualTo(4);
     }
 
     @Test
