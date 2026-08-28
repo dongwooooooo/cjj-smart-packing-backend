@@ -6,6 +6,7 @@ import com.awesome.backend.demo.service.DemoBarcodeFeeder;
 import com.awesome.backend.demo.service.DemoInferenceWarmup;
 import com.awesome.backend.demo.service.DemoOrderFeeder;
 import com.awesome.backend.demo.service.DemoResetService;
+import com.awesome.backend.demo.service.DemoToteFeeder;
 import com.awesome.backend.demo.service.DemoResetSummary;
 import com.awesome.backend.demo.service.DemoStatus;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,15 +29,18 @@ public class DemoAdminController {
     private final DemoAutoFeeder demoAutoFeeder;
     private final DemoInferenceWarmup warmup;
     private final DemoBarcodeFeeder barcodeFeeder;
+    private final DemoToteFeeder toteFeeder;
 
     public DemoAdminController(DemoResetService demoResetService, DemoOrderFeeder demoOrderFeeder,
                                DemoAutoFeeder demoAutoFeeder,
-                               DemoInferenceWarmup warmup, DemoBarcodeFeeder barcodeFeeder) {
+                               DemoInferenceWarmup warmup, DemoBarcodeFeeder barcodeFeeder,
+                               DemoToteFeeder toteFeeder) {
         this.demoResetService = demoResetService;
         this.demoOrderFeeder = demoOrderFeeder;
         this.demoAutoFeeder = demoAutoFeeder;
         this.warmup = warmup;
         this.barcodeFeeder = barcodeFeeder;
+        this.toteFeeder = toteFeeder;
     }
 
     @Operation(summary = "시연 리셋",
@@ -99,5 +103,17 @@ public class DemoAdminController {
     @DeleteMapping("/orders/auto")
     public void stopAuto() {
         demoAutoFeeder.stop();
+    }
+
+    @Operation(summary = "다음 시연 토트 바코드",
+            description = "포장 시연에서 지정한 라인의 다음 토트 바코드를 하나 내준다. 시연장에 "
+                    + "스캐너가 없어 화면의 버튼이 이 통로로 바코드를 받아 스캔 칸을 채운다. "
+                    + "아직 포장이 끝나지 않고 토트가 붙은 배송단위를 만들어진 순서대로 주며, "
+                    + "한 번 내준 토트는 다시 나오지 않는다. 더 없으면 204. 리셋하면 처음부터 다시 준다.")
+    @PostMapping("/outbound/next-tote")
+    public ResponseEntity<DemoToteFeeder.DemoTote> nextTote(@RequestParam Long lineId) {
+        return toteFeeder.next(lineId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 }

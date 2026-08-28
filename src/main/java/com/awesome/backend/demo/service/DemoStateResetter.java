@@ -34,6 +34,7 @@ public class DemoStateResetter {
         jdbcTemplate.update("delete from measurement_session");
         jdbcTemplate.update("delete from inventory_tx");
         jdbcTemplate.update("delete from demo_order_queue");
+        jdbcTemplate.update("delete from demo_served_tote");
     }
 
     /** 토트는 전부 유휴, 박스 재고는 seed 수준으로 (명세 §4-2). */
