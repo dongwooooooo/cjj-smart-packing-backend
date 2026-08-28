@@ -22,13 +22,15 @@ public class InboundScanService {
     private final ProductRepository productRepository;
     private final KoreanNetMasterRepository koreanNetMasterRepository;
     private final CategoryRepository categoryRepository;
+    private final MasterImageSource masterImages;
 
     public InboundScanService(ProductRepository productRepository,
                               KoreanNetMasterRepository koreanNetMasterRepository,
-                              CategoryRepository categoryRepository) {
+                              CategoryRepository categoryRepository, MasterImageSource masterImages) {
         this.productRepository = productRepository;
         this.koreanNetMasterRepository = koreanNetMasterRepository;
         this.categoryRepository = categoryRepository;
+        this.masterImages = masterImages;
     }
 
     /**
@@ -48,14 +50,14 @@ public class InboundScanService {
             ScanJudgment judgment = product.hasConfirmedDimensions()
                     ? ScanJudgment.REGISTERED
                     : ScanJudgment.NEW;
-            return ScanResponse.of(judgment, ProductSummary.from(product, categoryOf(product)));
+            return ScanResponse.of(judgment, ProductSummary.from(product, categoryOf(product), masterImages.urlFor(product)));
         }
 
         return koreanNetMasterRepository.findByGtin(barcode)
                 .map(master -> {
                     Product created = productRepository.save(
                             Product.fromMaster(master, resolveImageUrl(master)));
-                    return ScanResponse.of(ScanJudgment.NEW, ProductSummary.from(created, categoryOf(created)));
+                    return ScanResponse.of(ScanJudgment.NEW, ProductSummary.from(created, categoryOf(created), masterImages.urlFor(created)));
                 })
                 .orElseGet(ScanResponse::unknown);
     }
