@@ -253,29 +253,6 @@
     ]
   },
   {
-    "gtin": "8805017800214",
-    "name": "고추 맛기름 1.8L",
-    "mediumCategoryCode": "0101",
-    "pool": "INBOUND",
-    "dims": {
-      "widthCm": 10.6,
-      "lengthCm": 10.3,
-      "heightCm": 31.7
-    },
-    "weightKg": 1.738,
-    "flags": {
-      "refrigerate": false,
-      "fragile": true,
-      "irregular": false
-    },
-    "stockQty": 0,
-    "images": [
-      "images/8805017800214/cam1.jpg",
-      "images/8805017800214/cam2.jpg",
-      "images/8805017800214/cam3.jpg"
-    ]
-  },
-  {
     "gtin": "8801005109000",
     "name": "샘표 국간장 860ml",
     "mediumCategoryCode": "0101",
@@ -319,29 +296,6 @@
       "images/8801043012638/cam1.jpg",
       "images/8801043012638/cam2.jpg",
       "images/8801043012638/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8809734280533",
-    "name": "미마 보건용마스크 KF80 흰색SS (10개입)",
-    "mediumCategoryCode": "0504",
-    "pool": "INBOUND",
-    "dims": {
-      "widthCm": 23.9,
-      "lengthCm": 15.5,
-      "heightCm": 3.7
-    },
-    "weightKg": 0.07,
-    "flags": {
-      "refrigerate": false,
-      "fragile": false,
-      "irregular": false
-    },
-    "stockQty": 0,
-    "images": [
-      "images/8809734280533/cam1.jpg",
-      "images/8809734280533/cam2.jpg",
-      "images/8809734280533/cam3.jpg"
     ]
   },
   {

@@ -73,36 +73,60 @@ class DemoResetIT {
         mvc.perform(post(RESET)).andExpect(status().isOk());
     }
 
+    /** 기대 수치는 products.json 에서 읽는다 — 시연 상품이 바뀔 때마다 테스트를 고치지 않도록. */
+    private static long countInFile(String pool) {
+        try {
+            String json = java.nio.file.Files.readString(
+                    java.nio.file.Path.of("demo/data/products.json"));
+            return java.util.regex.Pattern.compile("\"pool\"\\s*:\\s*\"" + pool + "\"")
+                    .matcher(json).results().count();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("products.json 을 읽지 못했다", e);
+        }
+    }
+
+    private static long totalInFile() {
+        return countInFile("INBOUND") + countInFile("OUTBOUND");
+    }
+
     @Test
     void 목록에서_빠진_상품은_리셋이_데모에서_빼고_재고도_되돌린다() throws Exception {
         // 지난 런의 잔여를 흉내낸다 — products.json 에 없는 상품이 데모 풀에 남아 있는 상태.
         // 그대로 두면 화면 상품 수가 부풀고, 사진이 없어 촬영이 NO_IMAGES 로 실패한다.
-        String dropped = "8801234500011";
+        String dropped = "8809999999999";
+        jdbcTemplate.update("""
+                insert into korean_net_master (gtin, product_name, medium_category_code, batch_id, imported_at)
+                values (?, '지난 런 잔여 상품', 'C1010', 'TEST', now())
+                on conflict (gtin) do nothing""", dropped);
+        jdbcTemplate.update("""
+                insert into product (gtin, name, medium_category_code, image_url, source, dim_status, stock_qty)
+                values (?, '지난 런 잔여 상품', 'C1010', 'x', 'MASTER', 'NONE', 40)
+                on conflict (gtin) do update set stock_qty = 40""", dropped);
         jdbcTemplate.update("""
                 insert into demo_product (gtin, pool, gt_width_cm, gt_length_cm, gt_height_cm, image_dir)
                 values (?, 'INBOUND', 7.0, 7.0, 23.0, 'images/' || ?)
                 on conflict (gtin) do nothing""", dropped, dropped);
-        jdbcTemplate.update("update product set stock_qty = 40 where gtin = ?", dropped);
 
         reset();
 
         assertThat(demoProductRepository.findById(dropped)).isEmpty();
         assertThat(productRepository.findByGtin(dropped).orElseThrow().stockQty()).isZero();
         // 파일에 있는 상품은 그대로 남는다
-        assertThat(demoProductRepository.count()).isEqualTo(16);
+        assertThat(demoProductRepository.count()).isEqualTo(totalInFile());
     }
 
     @Test
     void 리셋하면_요약을_돌려준다() throws Exception {
         mvc.perform(post(RESET))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.products.inbound").value(6))
+                .andExpect(jsonPath("$.products.inbound").value((int) countInFile("INBOUND")))
                 .andExpect(jsonPath("$.products.outbound").value(10))
                 .andExpect(jsonPath("$.queuedBatches").value(BATCHES))
                 .andExpect(jsonPath("$.totes.idle").value(TOTES))
                 .andExpect(jsonPath("$.totes.assigned").value(0))
                 .andExpect(jsonPath("$.boxTypes.stockQty").value(100))
-                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString("입고 풀 6")));
+                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString(
+                        "입고 풀 " + countInFile("INBOUND"))));
     }
 
     @Test
@@ -169,7 +193,7 @@ class DemoResetIT {
     @Test
     void 남아_있던_측정_세션을_지운다() throws Exception {
         reset();
-        Long productId = productRepository.findByGtin("8801234500028").orElseThrow().id();
+        Long productId = productRepository.findByGtin(demoProductRepository.findByPool(DemoProduct.Pool.INBOUND).getFirst().gtin()).orElseThrow().id();
         jdbcTemplate.update("""
                 insert into measurement_session (product_id, status, gate_passed, created_at)
                 values (?, 'INFERRED', false, now())
@@ -186,7 +210,7 @@ class DemoResetIT {
 
         mvc.perform(get(STATUS))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.products[?(@.pool == 'INBOUND')].items.length()").value(6))
+                .andExpect(jsonPath("$.products[?(@.pool == 'INBOUND')].items.length()").value((int) countInFile("INBOUND")))
                 .andExpect(jsonPath("$.products[?(@.pool == 'OUTBOUND')].items.length()").value(10))
                 .andExpect(jsonPath("$.batches.length()").value(BATCHES))
                 .andExpect(jsonPath("$.batches[0].seq").value(1))
@@ -203,7 +227,7 @@ class DemoResetIT {
     @Test
     void 남아_있던_측정_세션은_이미지까지_함께_지운다() throws Exception {
         reset();
-        Long productId = productRepository.findByGtin("8801234500028").orElseThrow().id();
+        Long productId = productRepository.findByGtin(demoProductRepository.findByPool(DemoProduct.Pool.INBOUND).getFirst().gtin()).orElseThrow().id();
         jdbcTemplate.update("""
                 insert into measurement_session (id, product_id, status, gate_passed, created_at)
                 values (9001, ?, 'INFERRED', false, now())
