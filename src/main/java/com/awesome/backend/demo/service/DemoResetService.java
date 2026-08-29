@@ -43,6 +43,7 @@ public class DemoResetService {
     private final OrderRepository orderRepository;
     private final ShipmentRepository shipmentRepository;
     private final DemoAutoFeeder autoFeeder;
+    private final DemoOrderFeeder orderFeeder;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DemoResetService(DemoDataLoader loader, DemoDataProperties properties,
@@ -51,7 +52,8 @@ public class DemoResetService {
                             DemoProductRepository demoProductRepository,
                             ProductRepository productRepository, ToteRepository toteRepository,
                             BoxTypeRepository boxTypeRepository, OrderRepository orderRepository,
-                            ShipmentRepository shipmentRepository, DemoAutoFeeder autoFeeder) {
+                            ShipmentRepository shipmentRepository, DemoAutoFeeder autoFeeder,
+                            DemoOrderFeeder orderFeeder) {
         this.loader = loader;
         this.properties = properties;
         this.resetter = resetter;
@@ -64,6 +66,7 @@ public class DemoResetService {
         this.orderRepository = orderRepository;
         this.shipmentRepository = shipmentRepository;
         this.autoFeeder = autoFeeder;
+        this.orderFeeder = orderFeeder;
     }
 
     @Transactional
@@ -77,6 +80,7 @@ public class DemoResetService {
         resetter.restoreEquipment(properties.boxStockQty());
         provisioner.provision(products);
         queueBatches(batches);
+        int released = prerelease(batches.size());
 
         int inbound = (int) products.stream()
                 .filter(p -> p.pool() == DemoProduct.Pool.INBOUND).count();
@@ -88,8 +92,9 @@ public class DemoResetService {
                 batches.size(),
                 new DemoResetSummary.Totes(idle, assigned),
                 new DemoResetSummary.BoxTypes(boxes, properties.boxStockQty()),
-                summaryText(inbound, products.size() - inbound, batches.size(), 0,
-                        idle, assigned, boxes, properties.boxStockQty(), 0, 0));
+                summaryText(inbound, products.size() - inbound, batches.size(), released,
+                        idle, assigned, boxes, properties.boxStockQty(),
+                        (int) orderRepository.count(), (int) shipmentRepository.count()));
     }
 
     @Transactional(readOnly = true)
@@ -146,6 +151,27 @@ public class DemoResetService {
         text.append("\n박스 %d종 각 %d개".formatted(boxes, boxStock));
         text.append("\n접수된 주문 %d건, 배송단위 %d개".formatted(orders, shipments));
         return text.toString();
+    }
+
+    /**
+     * 리셋 끝에 주문 묶음 몇 개를 미리 투입한다.
+     *
+     * <p>시연을 시작하면 라인마다 포장할 배송단위가 이미 놓여 있어야 한다 — 빈 화면에서
+     * 시작하면 보여줄 게 없다. 남긴 묶음은 시연 도중 화면의 Load 로 넣어 주문이 들어오는
+     * 장면을 만든다.
+     *
+     * @return 실제로 투입된 묶음 수. 설정값이 파일의 묶음 수보다 크면 있는 만큼만 넣는다.
+     */
+    private int prerelease(int totalBatches) {
+        int target = Math.min(Math.max(properties.prereleasedBatches(), 0), totalBatches);
+        int released = 0;
+        for (int i = 0; i < target; i++) {
+            if (orderFeeder.feedNext().isEmpty()) {
+                break;
+            }
+            released++;
+        }
+        return released;
     }
 
     private void queueBatches(List<String> batches) {

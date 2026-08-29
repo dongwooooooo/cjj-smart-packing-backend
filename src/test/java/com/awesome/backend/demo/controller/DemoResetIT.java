@@ -43,7 +43,7 @@ class DemoResetIT {
     /** 배치 수는 파일이 정한다 — 시연 구성이 바뀌어도 테스트가 따라 깨지지 않게 한다. */
     private static final int BATCHES = (int) batchesInFile();
 
-    /** V2 seed 10개 + V6 이 더한 30개. 접수가 주문마다 토트를 하나씩 잡는다. */
+    /** V2 seed 10개 + V6 이 더한 30개. 접수가 배송단위마다 토트를 하나씩 잡는다. */
     private static final int TOTES = 40;
 
     @Container
@@ -61,8 +61,21 @@ class DemoResetIT {
     @Autowired BoxTypeRepository boxTypeRepository;
     @Autowired MeasurementSessionRepository measurementSessionRepository;
     @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired com.awesome.backend.demo.service.DemoDataProperties demoProperties;
 
     private MockMvc mvc;
+
+    /** 리셋이 미리 투입한 묶음 수 — 설정값과 파일의 묶음 수 중 작은 쪽이다. */
+    private int prereleased() {
+        return Math.min(Math.max(demoProperties.prereleasedBatches(), 0), BATCHES);
+    }
+
+    /** 지금 토트를 잡고 있는 배송단위 수. 미리 투입한 주문이 그만큼 토트를 가져간다. */
+    private int activeAssignments() {
+        Integer count = jdbcTemplate.queryForObject(
+                "select count(*) from tote_assignment where released_at is null", Integer.class);
+        return count == null ? 0 : count;
+    }
 
     @BeforeEach
     void setUp() {
@@ -133,8 +146,8 @@ class DemoResetIT {
                 .andExpect(jsonPath("$.products.inbound").value((int) countInFile("INBOUND")))
                 .andExpect(jsonPath("$.products.outbound").value((int) countInFile("OUTBOUND")))
                 .andExpect(jsonPath("$.queuedBatches").value(BATCHES))
-                .andExpect(jsonPath("$.totes.idle").value(TOTES))
-                .andExpect(jsonPath("$.totes.assigned").value(0))
+                .andExpect(jsonPath("$.totes.idle").value(TOTES - activeAssignments()))
+                .andExpect(jsonPath("$.totes.assigned").value(activeAssignments()))
                 .andExpect(jsonPath("$.boxTypes.stockQty").value(100))
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString(
                         "입고 풀 " + countInFile("INBOUND"))));
@@ -178,15 +191,21 @@ class DemoResetIT {
     }
 
     @Test
-    void 대기열은_파일_순서대로_쌓이고_아직_투입_전이다() throws Exception {
+    void 대기열은_파일_순서대로_쌓이고_앞쪽은_미리_투입된다() throws Exception {
         reset();
 
         List<DemoOrderQueue> queued = queueRepository.findAllByOrderBySeqAsc();
         assertThat(queued).hasSize(BATCHES);
         assertThat(queued.getFirst().seq()).isEqualTo(1);
         assertThat(queued.getFirst().batchJson()).contains("R-DEMO-0001");
-        assertThat(queued).allSatisfy(batch -> assertThat(batch.releasedAt()).isNull());
-        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(BATCHES);
+
+        // 시연을 시작하면 라인마다 포장할 배송단위가 이미 놓여 있어야 한다. 앞쪽 묶음은
+        // 리셋이 미리 투입하고, 남긴 묶음은 시연 도중 화면의 Load 로 넣는다.
+        assertThat(queued.stream().filter(batch -> batch.releasedAt() != null))
+                .hasSize(prereleased());
+        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(BATCHES - prereleased());
+        assertThat(queued.subList(0, prereleased()))
+                .allSatisfy(batch -> assertThat(batch.releasedAt()).isNotNull());
     }
 
     @Test
@@ -198,7 +217,8 @@ class DemoResetIT {
 
         assertThat(boxTypeRepository.findAll()).allSatisfy(
                 box -> assertThat(box.stockQty()).isEqualTo(100));
-        assertThat(toteRepository.findByStatusOrderByIdAsc(Tote.Status.IDLE)).hasSize(TOTES);
+        assertThat(toteRepository.findByStatusOrderByIdAsc(Tote.Status.IDLE))
+                .hasSize(TOTES - activeAssignments());
     }
 
     @Test
@@ -227,13 +247,13 @@ class DemoResetIT {
                 .andExpect(jsonPath("$.batches.length()").value(BATCHES))
                 .andExpect(jsonPath("$.batches[0].seq").value(1))
                 .andExpect(jsonPath("$.batches[0].orderCount").value(1))
-                .andExpect(jsonPath("$.batches[0].released").value(false))
-                .andExpect(jsonPath("$.totes.idle").value(TOTES))
+                .andExpect(jsonPath("$.batches[0].released").value(true))
+                .andExpect(jsonPath("$.totes.idle").value(TOTES - activeAssignments()))
                 .andExpect(jsonPath("$.boxTypes.stockQty").value(100))
-                .andExpect(jsonPath("$.progress.orders").value(0))
-                .andExpect(jsonPath("$.progress.shipments").value(0))
-                .andExpect(jsonPath("$.summary").value(
-                        org.hamcrest.Matchers.containsString("대기 배치 " + BATCHES + "개 중 0개 투입")));
+                .andExpect(jsonPath("$.progress.orders").value(prereleased()))
+                .andExpect(jsonPath("$.progress.shipments").value(activeAssignments()))
+                .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString(
+                        "대기 배치 " + BATCHES + "개 중 " + prereleased() + "개 투입")));
     }
 
     @Test
