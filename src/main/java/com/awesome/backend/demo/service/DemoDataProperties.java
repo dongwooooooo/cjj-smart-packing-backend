@@ -11,10 +11,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param prereleasedBatches 리셋 끝에 미리 투입할 주문 묶음 수. 시연을 시작하면 라인마다 포장할
  *                           배송단위가 이미 놓여 있어야 한다 — 빈 화면에서 시작하면 보여줄 게 없다.
  *                           남은 묶음은 시연 도중 Load 로 넣어 "주문이 들어왔다" 장면을 만든다.
+ * @param prepackedShipments 리셋 끝에 라인마다 미리 포장해 둘 건수. 시연을 열었을 때 완료된
+ *                           것과 남은 것이 함께 보여야 화면이 일하는 중으로 읽힌다.
  * @param warmupInference 리셋 끝에 추론을 한 번 깨울지. Lambda 콜드 스타트(10초)가 시연 첫
  *                        장면을 실패로 보이게 하는 것을 막는다
  */
 @ConfigurationProperties(prefix = "demo")
 public record DemoDataProperties(String dataDir, int boxStockQty, int prereleasedBatches,
-                                 boolean warmupInference) {
+                                 int prepackedShipments, boolean warmupInference) {
 }

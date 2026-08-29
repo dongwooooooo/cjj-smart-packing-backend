@@ -35,7 +35,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 /**
  * 시연 리셋과 상태 조회 (명세 §4). 한 번 눌러 시연 시작 상태를 만든다.
  */
-@SpringBootTest
+/*
+ * 미리 포장해 두는 몫을 끈다. 이 테스트가 보는 것은 리셋이 처음 상태를 만들어 내는가라,
+ * 포장이 재고와 박스를 쓰기 시작하면 무엇이 리셋의 결과인지 가려진다.
+ * 미리 포장하는 동작은 DemoPrepackIT 가 본다.
+ */
+@SpringBootTest(properties = "demo.prepacked-shipments=0")
 @Testcontainers
 @Transactional
 class DemoResetIT {
@@ -43,8 +48,14 @@ class DemoResetIT {
     /** 배치 수는 파일이 정한다 — 시연 구성이 바뀌어도 테스트가 따라 깨지지 않게 한다. */
     private static final int BATCHES = (int) batchesInFile();
 
-    /** V2 seed 10개 + V6 이 더한 30개. 접수가 배송단위마다 토트를 하나씩 잡는다. */
-    private static final int TOTES = 40;
+    /**
+     * 토트 수는 DB 에서 센다 — seed 가 늘어날 때마다 이 숫자를 고치지 않도록. 접수가 배송단위
+     * 마다 토트를 하나씩 잡으므로, 대기 중인 토트는 전체에서 지금 잡힌 만큼을 뺀 값이다.
+     */
+    private int totalTotes() {
+        Integer count = jdbcTemplate.queryForObject("select count(*) from tote", Integer.class);
+        return count == null ? 0 : count;
+    }
 
     @Container
     @ServiceConnection
@@ -146,7 +157,7 @@ class DemoResetIT {
                 .andExpect(jsonPath("$.products.inbound").value((int) countInFile("INBOUND")))
                 .andExpect(jsonPath("$.products.outbound").value((int) countInFile("OUTBOUND")))
                 .andExpect(jsonPath("$.queuedBatches").value(BATCHES))
-                .andExpect(jsonPath("$.totes.idle").value(TOTES - activeAssignments()))
+                .andExpect(jsonPath("$.totes.idle").value(totalTotes() - activeAssignments()))
                 .andExpect(jsonPath("$.totes.assigned").value(activeAssignments()))
                 .andExpect(jsonPath("$.boxTypes.stockQty").value(100))
                 .andExpect(jsonPath("$.summary").value(org.hamcrest.Matchers.containsString(
@@ -218,7 +229,7 @@ class DemoResetIT {
         assertThat(boxTypeRepository.findAll()).allSatisfy(
                 box -> assertThat(box.stockQty()).isEqualTo(100));
         assertThat(toteRepository.findByStatusOrderByIdAsc(Tote.Status.IDLE))
-                .hasSize(TOTES - activeAssignments());
+                .hasSize(totalTotes() - activeAssignments());
     }
 
     @Test
@@ -248,7 +259,7 @@ class DemoResetIT {
                 .andExpect(jsonPath("$.batches[0].seq").value(1))
                 .andExpect(jsonPath("$.batches[0].orderCount").value(1))
                 .andExpect(jsonPath("$.batches[0].released").value(true))
-                .andExpect(jsonPath("$.totes.idle").value(TOTES - activeAssignments()))
+                .andExpect(jsonPath("$.totes.idle").value(totalTotes() - activeAssignments()))
                 .andExpect(jsonPath("$.boxTypes.stockQty").value(100))
                 .andExpect(jsonPath("$.progress.orders").value(prereleased()))
                 .andExpect(jsonPath("$.progress.shipments").value(activeAssignments()))
