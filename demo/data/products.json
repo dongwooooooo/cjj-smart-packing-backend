@@ -1,44 +1,44 @@
 [
   {
-    "gtin": "8801047123729",
-    "name": "동원 고추참치 90g",
-    "mediumCategoryCode": "0106",
-    "pool": "OUTBOUND",
+    "gtin": "8801007442488",
+    "name": "CJ제일제당 백설 고추장삼겹살구이양념 2450G",
+    "mediumCategoryCode": "0101",
+    "pool": "INBOUND",
     "dims": {
-      "widthCm": 7.4,
-      "lengthCm": 7.3,
-      "heightCm": 3.3
+      "widthCm": 11.4,
+      "lengthCm": 11.4,
+      "heightCm": 28.1
     },
-    "weightKg": 0.126,
+    "weightKg": 2.602,
     "flags": {
       "refrigerate": false,
-      "fragile": false,
-      "irregular": false
+      "fragile": true,
+      "irregular": true
     },
-    "stockQty": 60,
+    "stockQty": 0,
     "images": [
-      "images/8801047123729/cam1.jpg",
-      "images/8801047123729/cam2.jpg",
-      "images/8801047123729/cam3.jpg"
+      "images/8801007442488/cam1.jpg",
+      "images/8801007442488/cam2.jpg",
+      "images/8801007442488/cam3.jpg"
     ]
   },
   {
     "gtin": "8801007526492",
     "name": "씨제이제일제당(주) 비비고 사골곰탕 500g",
     "mediumCategoryCode": "0112",
-    "pool": "OUTBOUND",
+    "pool": "INBOUND",
     "dims": {
-      "widthCm": 15.6,
-      "lengthCm": 5.8,
+      "widthCm": 5.8,
+      "lengthCm": 15.6,
       "heightCm": 21.8
     },
     "weightKg": 0.526,
     "flags": {
       "refrigerate": false,
-      "fragile": false,
-      "irregular": false
+      "fragile": true,
+      "irregular": true
     },
-    "stockQty": 40,
+    "stockQty": 0,
     "images": [
       "images/8801007526492/cam1.jpg",
       "images/8801007526492/cam2.jpg",
@@ -46,118 +46,233 @@
     ]
   },
   {
-    "gtin": "8801005109000",
-    "name": "샘표 국간장 860ml",
+    "gtin": "8801007139265",
+    "name": "CJ제일제당 스팸1.81kg",
+    "mediumCategoryCode": "0106",
+    "pool": "INBOUND",
+    "dims": {
+      "widthCm": 10.1,
+      "lengthCm": 10.1,
+      "heightCm": 19.8
+    },
+    "weightKg": 2.034,
+    "flags": {
+      "refrigerate": true,
+      "fragile": true,
+      "irregular": false
+    },
+    "stockQty": 0,
+    "images": [
+      "images/8801007139265/cam1.jpg",
+      "images/8801007139265/cam2.jpg",
+      "images/8801007139265/cam3.jpg"
+    ]
+  },
+  {
+    "gtin": "8801007106618",
+    "name": "CJ제일제당 햇반 200G",
+    "mediumCategoryCode": "0112",
+    "pool": "OUTBOUND",
+    "dims": {
+      "widthCm": 13.3,
+      "lengthCm": 13.6,
+      "heightCm": 3.8
+    },
+    "weightKg": 0.208,
+    "flags": {
+      "refrigerate": false,
+      "fragile": true,
+      "irregular": true
+    },
+    "stockQty": 120,
+    "images": [
+      "images/8801007106618/cam1.jpg",
+      "images/8801007106618/cam2.jpg",
+      "images/8801007106618/cam3.jpg"
+    ]
+  },
+  {
+    "gtin": "8801392018480",
+    "name": "씨제이제일제당(주) 햇반컵반 BIG 소고기미역국밥 311g",
+    "mediumCategoryCode": "0112",
+    "pool": "OUTBOUND",
+    "dims": {
+      "widthCm": 13.5,
+      "lengthCm": 13.3,
+      "heightCm": 9.6
+    },
+    "weightKg": 0.36,
+    "flags": {
+      "refrigerate": false,
+      "fragile": true,
+      "irregular": true
+    },
+    "stockQty": 120,
+    "images": [
+      "images/8801392018480/cam1.jpg",
+      "images/8801392018480/cam2.jpg",
+      "images/8801392018480/cam3.jpg"
+    ]
+  },
+  {
+    "gtin": "8801007820415",
+    "name": "씨제이제일제당(주) 햇반컵반 불닭마요덮밥 219g",
+    "mediumCategoryCode": "0112",
+    "pool": "OUTBOUND",
+    "dims": {
+      "widthCm": 13.6,
+      "lengthCm": 13.4,
+      "heightCm": 9.9
+    },
+    "weightKg": 0.264,
+    "flags": {
+      "refrigerate": false,
+      "fragile": true,
+      "irregular": true
+    },
+    "stockQty": 120,
+    "images": [
+      "images/8801007820415/cam1.jpg",
+      "images/8801007820415/cam2.jpg",
+      "images/8801007820415/cam3.jpg"
+    ]
+  },
+  {
+    "gtin": "8801007556376",
+    "name": "CJ제일제당 비비고 닭곰탕 500g",
+    "mediumCategoryCode": "0112",
+    "pool": "OUTBOUND",
+    "dims": {
+      "widthCm": 21.7,
+      "lengthCm": 16.0,
+      "heightCm": 3.4
+    },
+    "weightKg": 0.548,
+    "flags": {
+      "refrigerate": false,
+      "fragile": true,
+      "irregular": true
+    },
+    "stockQty": 120,
+    "images": [
+      "images/8801007556376/cam1.jpg",
+      "images/8801007556376/cam2.jpg",
+      "images/8801007556376/cam3.jpg"
+    ]
+  },
+  {
+    "gtin": "8801007965697",
+    "name": "씨제이제일제당(주) 비비고 해물누룽지죽 420g",
+    "mediumCategoryCode": "0112",
+    "pool": "OUTBOUND",
+    "dims": {
+      "widthCm": 21.6,
+      "lengthCm": 15.4,
+      "heightCm": 2.7
+    },
+    "weightKg": 0.428,
+    "flags": {
+      "refrigerate": false,
+      "fragile": true,
+      "irregular": true
+    },
+    "stockQty": 120,
+    "images": [
+      "images/8801007965697/cam1.jpg",
+      "images/8801007965697/cam2.jpg",
+      "images/8801007965697/cam3.jpg"
+    ]
+  },
+  {
+    "gtin": "8801007971339",
+    "name": "씨제이제일제당(주) 비비고 사골시래기된장국 460g",
+    "mediumCategoryCode": "0112",
+    "pool": "OUTBOUND",
+    "dims": {
+      "widthCm": 21.8,
+      "lengthCm": 16.0,
+      "heightCm": 4.8
+    },
+    "weightKg": 0.48,
+    "flags": {
+      "refrigerate": false,
+      "fragile": true,
+      "irregular": true
+    },
+    "stockQty": 120,
+    "images": [
+      "images/8801007971339/cam1.jpg",
+      "images/8801007971339/cam2.jpg",
+      "images/8801007971339/cam3.jpg"
+    ]
+  },
+  {
+    "gtin": "8801007176307",
+    "name": "CJ제일제당 백설 소갈비 양념 290G",
     "mediumCategoryCode": "0101",
     "pool": "OUTBOUND",
     "dims": {
-      "widthCm": 7.8,
-      "lengthCm": 7.7,
-      "heightCm": 25.2
+      "widthCm": 6.0,
+      "lengthCm": 6.2,
+      "heightCm": 13.5
     },
-    "weightKg": 1.07,
+    "weightKg": 0.506,
     "flags": {
       "refrigerate": false,
       "fragile": true,
-      "irregular": false
+      "irregular": true
     },
-    "stockQty": 25,
+    "stockQty": 120,
     "images": [
-      "images/8801005109000/cam1.jpg",
-      "images/8801005109000/cam2.jpg",
-      "images/8801005109000/cam3.jpg"
+      "images/8801007176307/cam1.jpg",
+      "images/8801007176307/cam2.jpg",
+      "images/8801007176307/cam3.jpg"
     ]
   },
   {
-    "gtin": "8806179696691",
-    "name": "네오플램 필리아 내열 냄비 16C 0.8L",
-    "mediumCategoryCode": "0311",
+    "gtin": "8801392094194",
+    "name": "씨제이제일제당(주) 백설 고추잡채 덮밥소스 140G",
+    "mediumCategoryCode": "0112",
     "pool": "OUTBOUND",
     "dims": {
-      "widthCm": 26.5,
-      "lengthCm": 21.5,
-      "heightCm": 12.0
+      "widthCm": 17.9,
+      "lengthCm": 12.8,
+      "heightCm": 2.4
     },
-    "weightKg": 1.394,
+    "weightKg": 0.142,
     "flags": {
       "refrigerate": false,
-      "fragile": false,
-      "irregular": false
+      "fragile": true,
+      "irregular": true
     },
-    "stockQty": 1,
+    "stockQty": 120,
     "images": [
-      "images/8806179696691/cam1.jpg",
-      "images/8806179696691/cam2.jpg",
-      "images/8806179696691/cam3.jpg"
+      "images/8801392094194/cam1.jpg",
+      "images/8801392094194/cam2.jpg",
+      "images/8801392094194/cam3.jpg"
     ]
   },
   {
-    "gtin": "8801043012638",
-    "name": "(주)농심 누들핏 카구리맛 40.5g",
-    "mediumCategoryCode": "0112",
-    "pool": "INBOUND",
-    "dims": {
-      "widthCm": 10.0,
-      "lengthCm": 9.9,
-      "heightCm": 9.9
-    },
-    "weightKg": 0.064,
-    "flags": {
-      "refrigerate": false,
-      "fragile": false,
-      "irregular": false
-    },
-    "stockQty": 0,
-    "images": [
-      "images/8801043012638/cam1.jpg",
-      "images/8801043012638/cam2.jpg",
-      "images/8801043012638/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8801117548612",
-    "name": "오리온 오뜨 치즈 12p",
-    "mediumCategoryCode": "0116",
-    "pool": "INBOUND",
-    "dims": {
-      "widthCm": 31.6,
-      "lengthCm": 25.2,
-      "heightCm": 3.9
-    },
-    "weightKg": 0.392,
-    "flags": {
-      "refrigerate": false,
-      "fragile": false,
-      "irregular": false
-    },
-    "stockQty": 0,
-    "images": [
-      "images/8801117548612/cam1.jpg",
-      "images/8801117548612/cam2.jpg",
-      "images/8801117548612/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8801119730015",
-    "name": "하이트진로(주) 테라 1600mL x 1페트",
-    "mediumCategoryCode": "0123",
-    "pool": "INBOUND",
+    "gtin": "8801392002168",
+    "name": "씨제이제일제당(주) 스팸 닭가슴살 200g",
+    "mediumCategoryCode": "0106",
+    "pool": "OUTBOUND",
     "dims": {
       "widthCm": 10.3,
-      "lengthCm": 10.2,
-      "heightCm": 31.8
+      "lengthCm": 5.8,
+      "heightCm": 5.5
     },
-    "weightKg": 1.662,
+    "weightKg": 0.222,
     "flags": {
       "refrigerate": false,
       "fragile": true,
       "irregular": false
     },
-    "stockQty": 0,
+    "stockQty": 120,
     "images": [
-      "images/8801119730015/cam1.jpg",
-      "images/8801119730015/cam2.jpg",
-      "images/8801119730015/cam3.jpg"
+      "images/8801392002168/cam1.jpg",
+      "images/8801392002168/cam2.jpg",
+      "images/8801392002168/cam3.jpg"
     ]
   }
 ]

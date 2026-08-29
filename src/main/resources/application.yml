@@ -37,7 +37,7 @@ demo:
   box-stock-qty: 100
   # 리셋 끝에 미리 투입할 주문 묶음 수. 시연을 시작하면 라인마다 포장할 배송단위가 이미
   # 놓여 있어야 한다. 남는 묶음은 시연 도중 Load 로 넣어 주문이 들어오는 장면을 만든다.
-  prereleased-batches: ${DEMO_PRERELEASED_BATCHES:15}
+  prereleased-batches: ${DEMO_PRERELEASED_BATCHES:30}
   # 리셋 끝에 라인마다 미리 포장해 둘 건수. 시연을 열었을 때 완료된 것과 남은 것이 함께
   # 보여야 화면이 일하는 중으로 읽힌다. 미리 포장한 만큼 재고가 실제로 빠진다.
   prepacked-shipments: ${DEMO_PREPACKED_SHIPMENTS:2}
