@@ -115,16 +115,16 @@
     ]
   },
   {
-    "gtin": "8801392100840",
-    "name": "씨제이제일제당(주) 백설 장아찌간장소스 1.75L",
-    "mediumCategoryCode": "0101",
+    "gtin": "8801392094194",
+    "name": "씨제이제일제당(주) 백설 고추잡채 덮밥소스 140G",
+    "mediumCategoryCode": "0112",
     "pool": "OUTBOUND",
     "dims": {
-      "widthCm": 10.6,
-      "lengthCm": 10.5,
-      "heightCm": 31.5
+      "widthCm": 17.9,
+      "lengthCm": 12.8,
+      "heightCm": 2.4
     },
-    "weightKg": 2.138,
+    "weightKg": 0.142,
     "flags": {
       "refrigerate": false,
       "fragile": true,
@@ -132,9 +132,9 @@
     },
     "stockQty": 120,
     "images": [
-      "images/8801392100840/cam1.jpg",
-      "images/8801392100840/cam2.jpg",
-      "images/8801392100840/cam3.jpg"
+      "images/8801392094194/cam1.jpg",
+      "images/8801392094194/cam2.jpg",
+      "images/8801392094194/cam3.jpg"
     ]
   },
   {
@@ -219,7 +219,7 @@
     "weightKg": 0.548,
     "flags": {
       "refrigerate": false,
-      "fragile": true,
+      "fragile": false,
       "irregular": false
     },
     "stockQty": 120,
@@ -242,7 +242,7 @@
     "weightKg": 0.48,
     "flags": {
       "refrigerate": false,
-      "fragile": true,
+      "fragile": false,
       "irregular": false
     },
     "stockQty": 120,
@@ -250,29 +250,6 @@
       "images/8801007971339/cam1.jpg",
       "images/8801007971339/cam2.jpg",
       "images/8801007971339/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8801392094194",
-    "name": "씨제이제일제당(주) 백설 고추잡채 덮밥소스 140G",
-    "mediumCategoryCode": "0112",
-    "pool": "OUTBOUND",
-    "dims": {
-      "widthCm": 17.9,
-      "lengthCm": 12.8,
-      "heightCm": 2.4
-    },
-    "weightKg": 0.142,
-    "flags": {
-      "refrigerate": false,
-      "fragile": true,
-      "irregular": false
-    },
-    "stockQty": 120,
-    "images": [
-      "images/8801392094194/cam1.jpg",
-      "images/8801392094194/cam2.jpg",
-      "images/8801392094194/cam3.jpg"
     ]
   }
 ]
