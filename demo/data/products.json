@@ -12,8 +12,8 @@
     "weightKg": 2.602,
     "flags": {
       "refrigerate": false,
-      "fragile": true,
-      "irregular": true
+      "fragile": false,
+      "irregular": false
     },
     "stockQty": 0,
     "images": [
@@ -35,8 +35,8 @@
     "weightKg": 0.526,
     "flags": {
       "refrigerate": false,
-      "fragile": true,
-      "irregular": true
+      "fragile": false,
+      "irregular": false
     },
     "stockQty": 0,
     "images": [
@@ -58,7 +58,7 @@
     "weightKg": 2.034,
     "flags": {
       "refrigerate": true,
-      "fragile": true,
+      "fragile": false,
       "irregular": false
     },
     "stockQty": 0,
@@ -115,26 +115,26 @@
     ]
   },
   {
-    "gtin": "8801007106618",
-    "name": "CJ제일제당 햇반 200G",
-    "mediumCategoryCode": "0112",
+    "gtin": "8801392100840",
+    "name": "씨제이제일제당(주) 백설 장아찌간장소스 1.75L",
+    "mediumCategoryCode": "0101",
     "pool": "OUTBOUND",
     "dims": {
-      "widthCm": 13.3,
-      "lengthCm": 13.6,
-      "heightCm": 3.8
+      "widthCm": 10.6,
+      "lengthCm": 10.5,
+      "heightCm": 31.5
     },
-    "weightKg": 0.208,
+    "weightKg": 2.138,
     "flags": {
       "refrigerate": false,
       "fragile": true,
-      "irregular": true
+      "irregular": false
     },
     "stockQty": 120,
     "images": [
-      "images/8801007106618/cam1.jpg",
-      "images/8801007106618/cam2.jpg",
-      "images/8801007106618/cam3.jpg"
+      "images/8801392100840/cam1.jpg",
+      "images/8801392100840/cam2.jpg",
+      "images/8801392100840/cam3.jpg"
     ]
   },
   {
@@ -150,7 +150,7 @@
     "weightKg": 0.22,
     "flags": {
       "refrigerate": false,
-      "fragile": true,
+      "fragile": false,
       "irregular": false
     },
     "stockQty": 120,
@@ -173,7 +173,7 @@
     "weightKg": 0.222,
     "flags": {
       "refrigerate": false,
-      "fragile": true,
+      "fragile": false,
       "irregular": false
     },
     "stockQty": 120,
@@ -196,7 +196,7 @@
     "weightKg": 0.222,
     "flags": {
       "refrigerate": false,
-      "fragile": true,
+      "fragile": false,
       "irregular": false
     },
     "stockQty": 120,
@@ -220,7 +220,7 @@
     "flags": {
       "refrigerate": false,
       "fragile": true,
-      "irregular": true
+      "irregular": false
     },
     "stockQty": 120,
     "images": [
@@ -243,7 +243,7 @@
     "flags": {
       "refrigerate": false,
       "fragile": true,
-      "irregular": true
+      "irregular": false
     },
     "stockQty": 120,
     "images": [
@@ -266,7 +266,7 @@
     "flags": {
       "refrigerate": false,
       "fragile": true,
-      "irregular": true
+      "irregular": false
     },
     "stockQty": 120,
     "images": [
