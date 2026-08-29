@@ -92,6 +92,29 @@
     ]
   },
   {
+    "gtin": "8801007065946",
+    "name": "CJ 제일제당 얼큰우동 한그릇 221g",
+    "mediumCategoryCode": "0112",
+    "pool": "OUTBOUND",
+    "dims": {
+      "widthCm": 18.0,
+      "lengthCm": 20.0,
+      "heightCm": 12.0
+    },
+    "weightKg": 0.433,
+    "flags": {
+      "refrigerate": false,
+      "fragile": false,
+      "irregular": false
+    },
+    "stockQty": 120,
+    "images": [
+      "images/8801007065946/cam1.jpg",
+      "images/8801007065946/cam2.jpg",
+      "images/8801007065946/cam3.jpg"
+    ]
+  },
+  {
     "gtin": "8801007106618",
     "name": "CJ제일제당 햇반 200G",
     "mediumCategoryCode": "0112",
@@ -112,29 +135,6 @@
       "images/8801007106618/cam1.jpg",
       "images/8801007106618/cam2.jpg",
       "images/8801007106618/cam3.jpg"
-    ]
-  },
-  {
-    "gtin": "8801392018480",
-    "name": "씨제이제일제당(주) 햇반컵반 BIG 소고기미역국밥 311g",
-    "mediumCategoryCode": "0112",
-    "pool": "OUTBOUND",
-    "dims": {
-      "widthCm": 13.5,
-      "lengthCm": 13.3,
-      "heightCm": 9.6
-    },
-    "weightKg": 0.36,
-    "flags": {
-      "refrigerate": false,
-      "fragile": true,
-      "irregular": true
-    },
-    "stockQty": 120,
-    "images": [
-      "images/8801392018480/cam1.jpg",
-      "images/8801392018480/cam2.jpg",
-      "images/8801392018480/cam3.jpg"
     ]
   },
   {
