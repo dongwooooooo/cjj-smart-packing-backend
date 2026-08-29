@@ -13,10 +13,13 @@ on:
   push:
     branches:
       - develop
+    # demo/ 는 빼지 않는다. 시연 데이터(demo/data)가 이미지에 함께 구워지고 서버가 그걸
+    # 읽으므로, 데이터만 바꾸면 빌드가 돌지 않아 서버에 영원히 반영되지 않는다. 실제로
+    # 데이터만 바꾼 변경이 배포되지 않아 손으로 빌드를 돌린 적이 있다.
+    # demo 안의 문서는 위의 '**.md' 가 이미 걸러낸다.
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - 'demo/**'
   workflow_dispatch:
     inputs:
       image_tag:
