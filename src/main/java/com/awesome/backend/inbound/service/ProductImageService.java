@@ -18,9 +18,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 제품 원본 이미지 조회 (02 §1-6). 출고 포장 화면(P2)이 소비하는 계약이다.
  *
- * <p>확정 세션의 촬영 3장을 우선 쓰고, 없으면 코리안넷 이미지로 대체한다 —
+ * <p>확정 세션의 촬영 3장을 우선 쓰고, 없으면 상품 사진 한 장으로 대체한다 —
  * 수기 확정(1-4 MANUAL)은 촬영을 거치지 않아 이미지가 없을 수 있고,
  * MEASURE_FAILED 세션을 수기 확정한 경우도 마찬가지다.
+ *
+ * <p>대체 사진은 스캔 1단이 쓰는 것과 같은 출처를 탄다. 출고 시연 상품은 촬영을 거치지 않아
+ * 늘 이 길로 오는데, 상품에 적힌 주소만 쓰면 사진이 없다고 나온다 — 실제 사진은 저장소에
+ * 올려 둔 것이다.
  */
 @Service
 public class ProductImageService {
@@ -28,13 +32,16 @@ public class ProductImageService {
     private final ProductRepository productRepository;
     private final MeasurementSessionRepository sessionRepository;
     private final MeasurementImageSource imageSource;
+    private final MasterImageSource masterImageSource;
 
     public ProductImageService(ProductRepository productRepository,
                                MeasurementSessionRepository sessionRepository,
-                               MeasurementImageSource imageSource) {
+                               MeasurementImageSource imageSource,
+                               MasterImageSource masterImageSource) {
         this.productRepository = productRepository;
         this.sessionRepository = sessionRepository;
         this.imageSource = imageSource;
+        this.masterImageSource = masterImageSource;
     }
 
     @Transactional(readOnly = true)
@@ -45,9 +52,10 @@ public class ProductImageService {
 
         return confirmedImages(productId)
                 .map(images -> ProductImagesResponse.ofMeasurement(images, imageSource::url))
-                // product.image_url 은 스캔 시 마스터에서 복사한 값이라 NOT NULL 이 보장된다.
-                // 마스터에 이미지가 없었으면 placeholder 가 들어 있다.
-                .orElseGet(() -> ProductImagesResponse.ofMasterFallback(product.imageUrl()));
+                // 저장소에 올려 둔 사진이 있으면 그것을, 없으면 상품에 적힌 값을 쓴다.
+                // 사진이 아예 없는 상품은 placeholder 가 남는다.
+                .orElseGet(() -> ProductImagesResponse.ofMasterFallback(
+                        masterImageSource.urlFor(product)));
     }
 
     /**
