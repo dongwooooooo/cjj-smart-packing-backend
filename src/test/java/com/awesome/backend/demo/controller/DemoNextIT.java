@@ -26,7 +26,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * 출고지시 한 건 투입 (명세 §5). 대기열 맨 앞 배치를 꺼내 접수한다.
  * 시연 중에는 이 버튼을 눌러 화면이 하나씩 채워지는 걸 보여준다.
  */
-@SpringBootTest
+/*
+ * 리셋이 미리 투입하는 몫을 끈다. 이 테스트가 보는 것은 주문을 하나씩 넣는 통로 자체라,
+ * 대기열이 비어 있는 상태에서 시작해야 몇 번째 묶음이 나가는지 확인할 수 있다.
+ * 미리 투입하는 동작은 DemoResetIT 가 본다.
+ */
+@SpringBootTest(properties = "demo.prereleased-batches=0")
 @Testcontainers
 @Transactional
 class DemoNextIT {

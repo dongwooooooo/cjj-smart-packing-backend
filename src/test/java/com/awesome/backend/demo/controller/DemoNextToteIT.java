@@ -28,7 +28,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>시연장에 스캐너가 없어 화면 버튼이 이 통로로 바코드를 받아 입력칸을 채운다.
  * 입고 쪽 바코드 통로와 같은 방식이다 — 내준 것은 표시해 두고, 리셋이 그 표시를 지운다.
  */
-@SpringBootTest
+/*
+ * 리셋이 미리 투입하는 몫을 끈다. 이 테스트가 보는 것은 주문을 하나씩 넣는 통로 자체라,
+ * 대기열이 비어 있는 상태에서 시작해야 몇 번째 묶음이 나가는지 확인할 수 있다.
+ * 미리 투입하는 동작은 DemoResetIT 가 본다.
+ */
+@SpringBootTest(properties = "demo.prereleased-batches=0")
 @Testcontainers
 @Transactional
 class DemoNextToteIT {

@@ -35,6 +35,9 @@ demo:
   # 시연 데이터 위치. 상대 경로라 로컬 실행과 컨테이너가 같은 값을 쓴다
   data-dir: ./demo/data
   box-stock-qty: 100
+  # 리셋 끝에 미리 투입할 주문 묶음 수. 시연을 시작하면 라인마다 포장할 배송단위가 이미
+  # 놓여 있어야 한다. 남는 묶음은 시연 도중 Load 로 넣어 주문이 들어오는 장면을 만든다.
+  prereleased-batches: ${DEMO_PRERELEASED_BATCHES:15}
   # 리셋 끝에 추론을 한 번 깨운다. Lambda 첫 호출은 콜드 스타트라 10초까지 걸리는데
   # 촬영 계약의 타임아웃이 8초라, 시연 첫 장면이 그대로 실패로 보인다.
   warmup-inference: ${DEMO_WARMUP_INFERENCE:true}

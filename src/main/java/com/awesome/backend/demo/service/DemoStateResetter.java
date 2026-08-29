@@ -1,5 +1,7 @@
 package com.awesome.backend.demo.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,11 +15,18 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>삭제 순서는 참조를 거는 쪽부터다 — 품목이 배송단위를, 배송단위가 주문을,
  * 이미지가 측정 세션을 참조한다. 순서를 뒤집으면 외래키에 걸린다.
+ *
+ * <p>지우기 전에 아직 안 나간 쓰기를 먼저 내보낸다. 삭제는 SQL 로 곧바로 나가지만 그 앞의
+ * 저장은 뒤늦게 나가기 때문에, 순서가 뒤집히면 방금 지운 자리에 옛 행이 다시 들어가 토트
+ * 배정이 겹친다.
  */
 @Component
 public class DemoStateResetter {
 
     private final JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public DemoStateResetter(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -25,6 +34,9 @@ public class DemoStateResetter {
 
     @Transactional
     public void clearDemoData() {
+        entityManager.flush();
+        entityManager.clear();
+
         jdbcTemplate.update("delete from tote_assignment");
         jdbcTemplate.update("delete from shipment_item");
         jdbcTemplate.update("delete from shipment");
