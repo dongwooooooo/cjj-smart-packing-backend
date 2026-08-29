@@ -44,6 +44,7 @@ public class DemoResetService {
     private final ShipmentRepository shipmentRepository;
     private final DemoAutoFeeder autoFeeder;
     private final DemoOrderFeeder orderFeeder;
+    private final DemoPrepacker prepacker;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DemoResetService(DemoDataLoader loader, DemoDataProperties properties,
@@ -53,7 +54,7 @@ public class DemoResetService {
                             ProductRepository productRepository, ToteRepository toteRepository,
                             BoxTypeRepository boxTypeRepository, OrderRepository orderRepository,
                             ShipmentRepository shipmentRepository, DemoAutoFeeder autoFeeder,
-                            DemoOrderFeeder orderFeeder) {
+                            DemoOrderFeeder orderFeeder, DemoPrepacker prepacker) {
         this.loader = loader;
         this.properties = properties;
         this.resetter = resetter;
@@ -67,6 +68,7 @@ public class DemoResetService {
         this.shipmentRepository = shipmentRepository;
         this.autoFeeder = autoFeeder;
         this.orderFeeder = orderFeeder;
+        this.prepacker = prepacker;
     }
 
     @Transactional
@@ -81,6 +83,7 @@ public class DemoResetService {
         provisioner.provision(products);
         queueBatches(batches);
         int released = prerelease(batches.size());
+        prepacker.prepack(properties.prepackedShipments());
 
         int inbound = (int) products.stream()
                 .filter(p -> p.pool() == DemoProduct.Pool.INBOUND).count();

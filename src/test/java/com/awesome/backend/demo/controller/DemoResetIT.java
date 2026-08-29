@@ -35,7 +35,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 /**
  * 시연 리셋과 상태 조회 (명세 §4). 한 번 눌러 시연 시작 상태를 만든다.
  */
-@SpringBootTest
+/*
+ * 미리 포장해 두는 몫을 끈다. 이 테스트가 보는 것은 리셋이 처음 상태를 만들어 내는가라,
+ * 포장이 재고와 박스를 쓰기 시작하면 무엇이 리셋의 결과인지 가려진다.
+ * 미리 포장하는 동작은 DemoPrepackIT 가 본다.
+ */
+@SpringBootTest(properties = "demo.prepacked-shipments=0")
 @Testcontainers
 @Transactional
 class DemoResetIT {
