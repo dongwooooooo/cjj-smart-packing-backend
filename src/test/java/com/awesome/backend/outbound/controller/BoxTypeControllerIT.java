@@ -53,7 +53,7 @@ class BoxTypeControllerIT {
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Test
-    void 박스타입_목록은_id_오름차순_5건을_반환한다() throws IOException, InterruptedException {
+    void 박스타입_목록은_id_오름차순_6건을_반환한다() throws IOException, InterruptedException {
         HttpRequest request =
                 HttpRequest.newBuilder()
                         .uri(URI.create("http://localhost:" + port + "/api/v1/box-types"))
@@ -66,11 +66,11 @@ class BoxTypeControllerIT {
         assertThat(response.statusCode()).isEqualTo(200);
         BoxTypeResponse[] body = objectMapper.readValue(response.body(), BoxTypeResponse[].class);
         assertThat(body).isNotNull();
-        assertThat(body).hasSize(5);
+        assertThat(body).hasSize(6);
 
         assertThat(body)
                 .extracting(BoxTypeResponse::boxTypeId)
-                .containsExactly(1L, 2L, 3L, 4L, 5L);
+                .containsExactly(1L, 2L, 3L, 4L, 5L, 6L);
 
         // V2__seed.sql box_type INSERT의 A호 행과 정확히 일치해야 한다.
         BoxTypeResponse aHo = body[0];
@@ -89,5 +89,15 @@ class BoxTypeControllerIT {
                         BigDecimal.valueOf(48.0).setScale(1),
                         BigDecimal.valueOf(38.0).setScale(1),
                         BigDecimal.valueOf(34.0).setScale(1));
+
+        // V12__box_type_add_f.sql box_type INSERT의 F호(우체국 소포 6호) 행과 정확히 일치해야 한다.
+        BoxTypeResponse fHo = body[5];
+        assertThat(fHo.name()).isEqualTo("F호");
+        assertThat(fHo.innerCm())
+                .containsExactly(
+                        BigDecimal.valueOf(52.0).setScale(1),
+                        BigDecimal.valueOf(48.0).setScale(1),
+                        BigDecimal.valueOf(40.0).setScale(1));
+        assertThat(fHo.stockQty()).isEqualTo(100);
     }
 }

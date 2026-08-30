@@ -32,13 +32,14 @@ class DemoSampleDataTest {
 
     private static final Path DATA_DIR = Path.of("demo/data");
 
-    // seed의 박스 A~E호 내치수 (V2)
+    // seed의 박스 A~F호 내치수 (V2 + V12)
     private static final List<CatalogBox> CATALOG = List.of(
             new CatalogBox(1, BoxSpec.ofCm(22.0, 19.0, 9.0)),
             new CatalogBox(2, BoxSpec.ofCm(27.0, 18.0, 15.0)),
             new CatalogBox(3, BoxSpec.ofCm(34.0, 25.0, 21.0)),
             new CatalogBox(4, BoxSpec.ofCm(41.0, 31.0, 28.0)),
-            new CatalogBox(5, BoxSpec.ofCm(48.0, 38.0, 34.0)));
+            new CatalogBox(5, BoxSpec.ofCm(48.0, 38.0, 34.0)),
+            new CatalogBox(6, BoxSpec.ofCm(52.0, 48.0, 40.0)));
 
     private final DemoDataLoader loader = new DemoDataLoader();
     private final BlockFactory blockFactory = new BlockFactory(1.0);
@@ -105,12 +106,12 @@ class DemoSampleDataTest {
     }
 
     @Test
-    void 앞선_세_배치가_합포장_분할_완충재를_보여준다() {
-        // 시연을 열면 세 장면이 차례로 나온다. 뒤 배치들은 대시보드를 채우는 몫이라
-        // 구성이 정해져 있지 않다.
+    void 합포장_분할_완충재_장면을_보여준다() {
+        // 시연 장면 셋 — 합포장(0001)·완충재 권유(0003)·분할(0005). F호(6호) 도입 이후
+        // 0002는 더 이상 분할되지 않아, 분할 장면은 0005로 옮겨졌다 (demo/scenario.md §3).
         assertThat(planFor("R-DEMO-0001")).hasSize(1);
-        assertThat(planFor("R-DEMO-0002")).hasSizeGreaterThan(1);
         assertThat(planFor("R-DEMO-0003")).anyMatch(ShipmentPlan::fillerRecommended);
+        assertThat(planFor("R-DEMO-0005")).hasSizeGreaterThan(1);
     }
 
     @Test

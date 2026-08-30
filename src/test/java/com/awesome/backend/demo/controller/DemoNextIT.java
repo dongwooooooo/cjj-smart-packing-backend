@@ -83,13 +83,19 @@ class DemoNextIT {
     @Test
     void 부를_때마다_다음_배치로_넘어간다() throws Exception {
         mvc.perform(post(NEXT)).andExpect(jsonPath("$.seq").value(1));
+        // box_type에 F호(6호)가 추가되면서 DEMO-2(R-DEMO-0002)는 더 이상 분할되지 않고
+        // 박스 하나(F호)에 들어간다 — 분할 장면은 DEMO-5 로 옮겼다 (demo/scenario.md §3).
         mvc.perform(post(NEXT)).andExpect(jsonPath("$.seq").value(2))
-                .andExpect(jsonPath("$.splitOrders").value(1));
+                .andExpect(jsonPath("$.splitOrders").value(0));
         int total = (int) queueRepository.count();
         mvc.perform(post(NEXT)).andExpect(jsonPath("$.seq").value(3))
                 .andExpect(jsonPath("$.remaining").value(total - 3));
+        mvc.perform(post(NEXT)).andExpect(jsonPath("$.seq").value(4));
+        // DEMO-5(R-DEMO-0005)가 새 분할 장면이다 — F호 + D호 두 배송단위로 나뉜다.
+        mvc.perform(post(NEXT)).andExpect(jsonPath("$.seq").value(5))
+                .andExpect(jsonPath("$.splitOrders").value(1));
 
-        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(total - 3);
+        assertThat(queueRepository.countByReleasedAtIsNull()).isEqualTo(total - 5);
     }
 
     @Test
