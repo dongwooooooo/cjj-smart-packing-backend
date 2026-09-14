@@ -113,6 +113,50 @@ class CartonizerWeightTest {
     }
 
     @Test
+    void 낱개를_빼면_담을_박스가_사라지는_이동은_기각한다() {
+        // 실측 벤치마크에서 나온 주문이다. 낱개 17개는 F호에 담기는데, 그중 하나를 빼면
+        // 16개가 어느 박스에도 담기지 않는다고 나온다 — 배치 판정이 휴리스틱이라 블록이
+        // 줄면 놓는 순서가 달라져 실제로는 있는 배치를 못 찾는다(§4-2 한계).
+        // 그런 이동을 후보로 남기면 박스를 정하지 못하는 편성이 만들어진다.
+        List<PackItem> items = new java.util.ArrayList<>();
+        items.addAll(copies("9001", 19.2, 18.7, 11.4, 0.411, 1));
+        items.addAll(copies("9002", 12.8, 10.0, 33.1, 3.026, 3));
+        items.addAll(copies("9003", 16.7, 21.9, 14.1, 0.518, 4));
+        items.addAll(copies("9004", 15.6, 15.0, 8.6, 0.227, 2));
+        items.addAll(copies("9005", 24.4, 13.6, 4.4, 0.420, 5));
+        items.addAll(copies("9006", 17.3, 16.6, 10.0, 0.287, 1));
+        items.addAll(copies("9007", 17.7, 18.4, 8.4, 0.304, 3));
+
+        List<ShipmentPlan> plans = cartonizer.cartonize(
+                List.copyOf(items), SIX_BOX_CATALOG, seedRates());
+
+        assertThat(plans).isNotEmpty();
+        assertThat(plans).allSatisfy(plan -> assertThat(plan.items()).isNotEmpty());
+        assertThat(plans.stream().mapToInt(p -> p.items().size()).sum()).isEqualTo(19);
+    }
+
+    /** V2 + V12 seed 박스 A~F호. */
+    private static final List<CatalogBox> SIX_BOX_CATALOG = List.of(
+            box(1, 22, 19, 9), box(2, 27, 18, 15), box(3, 34, 25, 21),
+            box(4, 41, 31, 28), box(5, 48, 38, 34), box(6, 52, 48, 40));
+
+    /** V13 seed 요금 구간표. */
+    private static RateTable seedRates() {
+        return new RateTable(List.of(
+                new RateTable.Tier(1, "극소형", 80, 2, 5000),
+                new RateTable.Tier(2, "소형", 100, 5, 6000),
+                new RateTable.Tier(3, "중형", 120, 10, 7000),
+                new RateTable.Tier(4, "대형", 140, 15, 8000),
+                new RateTable.Tier(5, "특대형", 160, 20, 9000)));
+    }
+
+    private static List<PackItem> copies(String gtin, double w, double l, double h,
+                                         double weightKg, int qty) {
+        return java.util.Collections.nCopies(qty,
+                new PackItem(gtin, Block.ofCm(w, l, h), weightKg, false, false));
+    }
+
+    @Test
     void 요금이_비어_있는_구간은_고르지_않는다() {
         // 극소형 구간의 요금이 미확정이면 그 구간에 걸리는 A호 대신, 요금을 아는 C호를 고른다.
         // 미확정을 0원으로 치면 근거 없이 그쪽을 선호하게 된다.

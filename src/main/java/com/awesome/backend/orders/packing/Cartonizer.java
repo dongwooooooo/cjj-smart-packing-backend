@@ -143,13 +143,19 @@ public class Cartonizer {
         if (minBox(target, ascending, rates) == null) {
             return null;
         }
+        List<PackItem> source = new ArrayList<>(units.get(from));
+        source.remove(i);
+        if (!source.isEmpty() && minBox(source, ascending, rates) == null) {
+            // 낱개를 빼면 오히려 담을 박스가 사라질 수 있다. 배치 판정이 휴리스틱이라 블록이
+            // 줄면 놓는 순서와 남는 공간의 모양이 달라져, 실제로는 들어가는 배치를 못 찾는다
+            // (§4-2 한계). 박스를 정하지 못하는 편성은 후보가 될 수 없으므로 이 이동을 기각한다.
+            return null;
+        }
         List<List<PackItem>> result = new ArrayList<>();
         for (int u = 0; u < units.size(); u++) {
             if (u == to) {
                 result.add(target);
             } else if (u == from) {
-                List<PackItem> source = new ArrayList<>(units.get(from));
-                source.remove(i);
                 if (!source.isEmpty()) {
                     result.add(source);
                 }
