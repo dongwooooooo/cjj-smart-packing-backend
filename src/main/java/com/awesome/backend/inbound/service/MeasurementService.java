@@ -15,6 +15,8 @@ import com.awesome.backend.inbound.repository.ProductRepository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class MeasurementService {
+
+    private static final Logger log = LoggerFactory.getLogger(MeasurementService.class);
 
 
 
@@ -67,10 +71,19 @@ public class MeasurementService {
 
         // 시연은 카메라 대신 데모 데이터셋 사진을 쓴다. 사진이 없으면 Lambda 추론은 실패하고
         // mock 은 사진을 보지 않는다 — 어느 쪽이든 판단은 클라이언트가 한다.
+        long t0 = System.nanoTime();
         List<CameraImage> images = imageSource.load(product);
+        long t1 = System.nanoTime();
         InferenceResult result = inferenceClient.infer(product, images);
+        long t2 = System.nanoTime();
 
-        return writer.save(productId, measuredWeightKg, images, result);
+        MeasurementResponse response = writer.save(productId, measuredWeightKg, images, result);
+        long t3 = System.nanoTime();
+        // 측정용 구간 로그: 사진 읽기 / 추론 호출 전체 / 세션·사진 저장
+        log.info("measure.timing productId={} images={} status={} loadMs={} inferMs={} saveMs={} totalMs={}",
+                productId, images.size(), response.status(), (t1 - t0) / 1_000_000,
+                (t2 - t1) / 1_000_000, (t3 - t2) / 1_000_000, (t3 - t0) / 1_000_000);
+        return response;
     }
 
     /**

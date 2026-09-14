@@ -17,7 +17,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "inference")
 public record InferenceProperties(String lambdaFunction, String apiKey, String region,
-                                  int timeoutSeconds, Gate gate, Mock mock) {
+                                  int timeoutSeconds, String endpointOverride, Gate gate, Mock mock) {
+
+    /** 로컬 측정용 — Lambda Runtime Interface Emulator 같은 대체 엔드포인트가 지정됐는지. */
+    public boolean hasEndpointOverride() {
+        return endpointOverride != null && !endpointOverride.isBlank();
+    }
 
     /** Lambda 함수가 지정되지 않았으면 mock 으로 동작한다 (D-04). */
     public boolean useMock() {

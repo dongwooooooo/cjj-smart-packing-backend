@@ -68,10 +68,15 @@ public class LambdaInferenceClient implements InferenceClient {
         }
 
         try {
+            long t0 = System.nanoTime();
+            byte[] event = buildEvent(images);
+            long t1 = System.nanoTime();
             InvokeResponse response = lambda.invoke(InvokeRequest.builder()
                     .functionName(functionName)
-                    .payload(SdkBytes.fromByteArray(buildEvent(images)))
+                    .payload(SdkBytes.fromByteArray(event))
                     .build());
+            long t2 = System.nanoTime();
+            int jpegBytes = images.stream().mapToInt(i -> i.jpeg().length).sum();
 
             if (response.functionError() != null) {
                 log.warn("Lambda 함수 오류. productId={} error={} payload={}", product.id(),
@@ -79,7 +84,13 @@ public class LambdaInferenceClient implements InferenceClient {
                 return InferenceResult.failed("LAMBDA_ERROR");
             }
 
-            return parse(response.payload().asUtf8String(), product);
+            InferenceResult parsed = parse(response.payload().asUtf8String(), product);
+            long t3 = System.nanoTime();
+            // 측정용 구간 로그: 이벤트 조립(base64+JSON) / Invoke 왕복 / 응답 파싱
+            log.info("inference.timing productId={} jpegBytes={} eventBytes={} buildMs={} invokeMs={} parseMs={}",
+                    product.id(), jpegBytes, event.length, (t1 - t0) / 1_000_000, (t2 - t1) / 1_000_000,
+                    (t3 - t2) / 1_000_000);
+            return parsed;
 
         } catch (ApiCallTimeoutException | ApiCallAttemptTimeoutException e) {
             // 콜드스타트(약 10초)가 8초 계약을 넘기면 여기로 온다. 시연 시간대에는 provisioned

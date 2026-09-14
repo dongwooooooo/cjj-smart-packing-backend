@@ -16,7 +16,7 @@ class MeasurementGateTest {
     private static final BigDecimal MAX_DIMENSION_CM = new BigDecimal("100.0");
 
     private final MeasurementGate gate = new MeasurementGate(new InferenceProperties(
-            null, null, null, 8,
+            null, null, null, 8, null,
             new InferenceProperties.Gate(MIN_CONFIDENCE, MAX_ASPECT_RATIO, MAX_DIMENSION_CM),
             null));
 

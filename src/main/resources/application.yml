@@ -61,6 +61,8 @@ inference:
   api-key: ${INFERENCE_API_KEY:}
   region: ${INFERENCE_AWS_REGION:ap-northeast-2}
   timeout-seconds: ${INFERENCE_TIMEOUT_SECONDS:8}
+  # 로컬 측정용. Lambda RIE 주소(예: http://host.docker.internal:9000). 비우면 실제 AWS
+  endpoint-override: ${INFERENCE_ENDPOINT_OVERRIDE:}
 
   # 신뢰도 게이트 (02 §1-3). 임계값은 아직 명세에 확정된 숫자가 없어 잠정값이다 —
   # 실제 모델 성능을 보고 조정하며, 코드 수정 없이 이 값만 바꾸면 된다.
