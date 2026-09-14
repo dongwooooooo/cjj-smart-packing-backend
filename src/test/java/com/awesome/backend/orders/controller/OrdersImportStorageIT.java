@@ -78,6 +78,10 @@ class OrdersImportStorageIT {
                 """, widthCm, lengthCm, heightCm, gtin);
     }
 
+    private void weight(String gtin, double weightKg) {
+        jdbcTemplate.update("update product set weight_kg = ? where gtin = ?", weightKg, gtin);
+    }
+
     @Test
     void 통과_주문은_주문과_배송단위로_저장되고_응답에_수치가_찬다() throws Exception {
         dimensions(CHIP, 5.0, 5.0, 2.0);
@@ -197,6 +201,40 @@ class OrdersImportStorageIT {
                 .andExpect(jsonPath("$.rejected[0].receiptNo").value("R-1"))
                 .andExpect(jsonPath("$.rejected[0].reason").value("OVERSIZED_ITEM"))
                 .andExpect(jsonPath("$.rejected[0].detail.gtin").value(JUICE));
+
+        assertThat(orderRepository.existsByReceiptNo("R-1")).isFalse();
+        assertThat(orderRepository.existsByReceiptNo("R-2")).isTrue();
+    }
+
+    @Test
+    void 무게_한도를_넘는_낱개는_해당_주문만_거부한다() throws Exception {
+        // 치수는 A호에도 들어가지만 25kg은 접수 한도 20kg을 넘어 나눠 담아도 해결되지 않는다
+        dimensions(JUICE, 10.0, 10.0, 10.0);
+        weight(JUICE, 25.0);
+        dimensions(CHIP, 5.0, 5.0, 2.0);
+        inventoryService.recordInbound(JUICE, 10);
+        inventoryService.recordInbound(CHIP, 10);
+
+        mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content("""
+                        {
+                          "batchId": "B-0821-1",
+                          "orders": [
+                            { "receiptNo": "R-1", "regionCode": "SEOUL",
+                              "orderedAt": "2026-08-21T09:00:00",
+                              "items": [ { "gtin": "%s", "qty": 1 } ] },
+                            { "receiptNo": "R-2", "regionCode": "SEOUL",
+                              "orderedAt": "2026-08-21T09:01:00",
+                              "items": [ { "gtin": "%s", "qty": 1 } ] }
+                          ]
+                        }
+                        """.formatted(JUICE, CHIP)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orders").value(1))
+                .andExpect(jsonPath("$.rejected.length()").value(1))
+                .andExpect(jsonPath("$.rejected[0].receiptNo").value("R-1"))
+                .andExpect(jsonPath("$.rejected[0].reason").value("OVERWEIGHT_ITEM"))
+                .andExpect(jsonPath("$.rejected[0].detail.gtin").value(JUICE))
+                .andExpect(jsonPath("$.rejected[0].detail.weightKg").value(25.0));
 
         assertThat(orderRepository.existsByReceiptNo("R-1")).isFalse();
         assertThat(orderRepository.existsByReceiptNo("R-2")).isTrue();
