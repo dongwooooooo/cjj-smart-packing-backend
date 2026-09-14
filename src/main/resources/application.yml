@@ -58,6 +58,10 @@ storage:
   # 엔드포인트 오버라이드에서만 쓴다. 실 AWS 는 인스턴스 프로파일로 인증한다 (D-24)
   access-key: ${STORAGE_ACCESS_KEY:}
   secret-key: ${STORAGE_SECRET_KEY:}
+  upload:
+    # 사진 업로드는 응답 뒤에 일어난다 — 실패해도 사용자에게 알릴 길이 없어 몇 번 더 해 본다 (D-27)
+    retry-count: ${STORAGE_UPLOAD_RETRY_COUNT:3}
+    retry-interval: ${STORAGE_UPLOAD_RETRY_INTERVAL:1s}
 
 inference:
   # Lambda 함수 이름(별칭 포함, 예: logistics-dimension-api:live). 비우면 mock (D-04, D-24)

@@ -60,11 +60,17 @@ public class MeasurementImageSource {
         return images;
     }
 
-    /** 세션에 귀속되는 키로 저장하고 그 키를 돌려준다. DB 에는 조회 주소가 아니라 이 키가 남는다. */
-    public String store(Long sessionId, CameraImage image) {
-        String key = "measurements/%d/cam%d.jpg".formatted(sessionId, image.cameraNo());
-        imageStore.write(key, image.jpeg());
-        return key;
+    /**
+     * 세션에 귀속되는 보관소 키. 저장은 하지 않는다 — 세션은 키만 정해 커밋하고, 실제 업로드는
+     * 커밋 뒤에 {@link MeasurementImageUploader} 가 한다 (D-27). DB 에는 조회 주소가 아니라 이 키가 남는다.
+     */
+    public String keyFor(Long sessionId, short cameraNo) {
+        return "measurements/%d/cam%d.jpg".formatted(sessionId, cameraNo);
+    }
+
+    /** 정해진 키로 보관소에 올린다. 실패는 그대로 던진다 — 재시도 판단은 부르는 쪽이 한다. */
+    public void put(String key, byte[] jpeg) {
+        imageStore.write(key, jpeg);
     }
 
     /** 저장된 키를 화면이 쓸 조회 주소로 바꾼다. */

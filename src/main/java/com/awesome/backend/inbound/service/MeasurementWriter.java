@@ -12,6 +12,7 @@ import com.awesome.backend.common.error.ErrorCode;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,17 +39,20 @@ public class MeasurementWriter {
     private final CategoryAttributeMapRepository categoryAttributeMapRepository;
     private final MeasurementImageSource imageSource;
     private final MeasurementGate gate;
+    private final ApplicationEventPublisher events;
 
     public MeasurementWriter(ProductRepository productRepository,
                              MeasurementSessionRepository sessionRepository,
                              CategoryAttributeMapRepository categoryAttributeMapRepository,
                              MeasurementImageSource imageSource,
-                             MeasurementGate gate) {
+                             MeasurementGate gate,
+                             ApplicationEventPublisher events) {
         this.productRepository = productRepository;
         this.sessionRepository = sessionRepository;
         this.categoryAttributeMapRepository = categoryAttributeMapRepository;
         this.imageSource = imageSource;
         this.gate = gate;
+        this.events = events;
     }
 
     /** 재촬영이면 이전 미확정 세션을 정리하고, 결과 상태의 세션을 하나 만든다. */
@@ -85,8 +89,12 @@ public class MeasurementWriter {
     }
 
     /**
-     * 추론에 쓴 사진을 세션 키로 보관소에 넣고, 그 키를 세션에 붙인다 (D-25).
+     * 추론에 쓴 사진의 보관소 키를 정해 세션에 붙이고, 업로드는 커밋 뒤로 넘긴다 (D-25, D-27).
      * 1-6 제품 이미지 조회가 같은 키를 읽어 조회 주소를 발급한다.
+     *
+     * <p>여기서 올리지 않는 이유는 S3 put 이 트랜잭션 안에 들어가기 때문이다 — 사진 3장을 올리는
+     * 동안 DB 커넥션을 잡고 있고, 촬영 응답도 그만큼 늦는다. 행은 PENDING 으로 커밋되고,
+     * 커밋 뒤 {@link MeasurementImageUploader} 가 올린 뒤 STORED 로 바꾼다.
      *
      * <p>DB 에 조회 주소를 넣지 않는 이유는 S3 임시 주소에 유효시간이 있어서다 — 저장해 두면
      * 곧 못 쓰는 값이 된다.
@@ -94,8 +102,21 @@ public class MeasurementWriter {
      * <p>사진이 없는 경우(mock 추론은 사진을 보지 않는다) 붙일 것도 없다.
      */
     private void attachImages(MeasurementSession session, List<CameraImage> images) {
-        images.forEach(image -> session.addImage(image.cameraNo(),
-                imageSource.store(session.getId(), image)));
+        if (images.isEmpty()) {
+            return;
+        }
+
+        List<MeasurementImagesPending.PendingImage> pending = images.stream()
+                .map(image -> {
+                    String key = imageSource.keyFor(session.getId(), image.cameraNo());
+                    session.addImage(image.cameraNo(), key);
+                    return new MeasurementImagesPending.PendingImage(
+                            image.cameraNo(), key, image.jpeg());
+                })
+                .toList();
+
+        // AFTER_COMMIT 리스너가 받는다. 롤백되면 발행만 되고 업로드는 일어나지 않는다.
+        events.publishEvent(new MeasurementImagesPending(session.getId(), pending));
     }
 
     /** 분류별 취급속성 기본값. 행이 없는 분류는 전부 false 로 취급한다 (03 §2). */

@@ -32,6 +32,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *
  * <p>세션은 1-3·1-4 를 호출해 만든다 — 실제 흐름에서 이미지가 붙는 경로가 그것뿐이다.
  * mock confidence 는 게이트 임계값 위로 고정한다(APPROVE 확정을 쓰기 때문).
+ *
+ * <p>사진 업로드는 커밋 뒤에 돈다 (D-27). 이 테스트는 테스트 트랜잭션 안에서 돌아 커밋이
+ * 일어나지 않으므로 업로드도 일어나지 않는다 — 업로드가 끝난 상태를 보려면
+ * {@link #markUploaded(Long)} 로 직접 STORED 로 바꾼다.
  */
 @SpringBootTest(properties = {
         "inference.mock.min-confidence=0.95",
@@ -87,6 +91,15 @@ class ProductImageControllerIT {
                 List.of(MeasurementStatus.INFERRED, MeasurementStatus.MEASURE_FAILED)).getFirst().getId();
     }
 
+    /** 커밋 뒤 업로드가 끝난 상태. 업로드 전(PENDING) 사진은 1-6 이 목록에서 뺀다 (D-27). */
+    private void markUploaded(Long sessionId) {
+        em.createQuery("update MeasurementImage i set i.uploadStatus = "
+                        + "com.awesome.backend.inbound.entity.ImageUploadStatus.STORED "
+                        + "where i.session.id = :id")
+                .setParameter("id", sessionId)
+                .executeUpdate();
+    }
+
     private void confirmApprove(Long sessionId) throws Exception {
         mvc.perform(post(MEASURE_PATH + "/" + sessionId + "/confirm")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -99,6 +112,7 @@ class ProductImageControllerIT {
         Long productId = juiceId();
         Long sessionId = measure(productId);
         confirmApprove(sessionId);
+        markUploaded(sessionId);
         em.flush();
         em.clear();
 
@@ -142,6 +156,7 @@ class ProductImageControllerIT {
         measure(productId);
         Long secondSessionId = measure(productId);   // 첫 세션은 DISCARDED 된다
         confirmApprove(secondSessionId);
+        markUploaded(secondSessionId);
         em.flush();
         em.clear();
 
@@ -176,6 +191,44 @@ class ProductImageControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.source").value("MASTER_FALLBACK"))
                 .andExpect(jsonPath("$.images[0].url").value(JUICE_IMAGE));
+    }
+
+    @Test
+    void 업로드_전_촬영본은_조회_목록에서_빠진다() throws Exception {
+        // 세션은 커밋됐지만 사진은 아직 보관소에 없다 (PENDING). 이때 임시 주소를 발급하면
+        // 화면은 깨진 이미지를 그린다 — 촬영본이 없는 것과 같게 마스터 사진으로 간다 (D-27)
+        Long productId = juiceId();
+        Long sessionId = measure(productId);
+        confirmApprove(sessionId);
+        em.flush();
+        em.clear();
+
+        mvc.perform(get(imagesPath(productId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.source").value("MASTER_FALLBACK"))
+                .andExpect(jsonPath("$.images[0].url").value(JUICE_IMAGE));
+    }
+
+    @Test
+    void 업로드에_실패한_사진은_조회_목록에서_빠진다() throws Exception {
+        // 재시도까지 실패해 FAILED 로 남은 사진. cam1 만 실패시키면 나머지 2장이 돌아온다
+        Long productId = juiceId();
+        Long sessionId = measure(productId);
+        confirmApprove(sessionId);
+        markUploaded(sessionId);
+        em.createQuery("update MeasurementImage i set i.uploadStatus = "
+                        + "com.awesome.backend.inbound.entity.ImageUploadStatus.FAILED "
+                        + "where i.session.id = :id and i.cameraNo = 1")
+                .setParameter("id", sessionId)
+                .executeUpdate();
+        em.flush();
+        em.clear();
+
+        mvc.perform(get(imagesPath(productId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.source").value("MEASUREMENT"))
+                .andExpect(jsonPath("$.images.length()").value(2))
+                .andExpect(jsonPath("$.images[0].cameraNo").value(2));
     }
 
     @Test

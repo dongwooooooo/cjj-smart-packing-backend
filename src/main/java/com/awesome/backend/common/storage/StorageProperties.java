@@ -17,11 +17,23 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param accessKey     엔드포인트 오버라이드에서 쓸 정적 자격증명. 실 AWS 는 EC2 인스턴스 프로파일을
  *                      쓰므로 비운다 (D-24)
  * @param secretKey     위와 같다
+ * @param upload        업로드 재시도 설정
  */
 @ConfigurationProperties(prefix = "storage")
 public record StorageProperties(String bucket, String region, Duration presignTtl,
                                 String localBasePath, String localUrlPrefix,
-                                String endpointOverride, String accessKey, String secretKey) {
+                                String endpointOverride, String accessKey, String secretKey,
+                                Upload upload) {
+
+    /**
+     * 사진 업로드 재시도 (D-27). 업로드는 응답 뒤에 일어나므로 실패해도 사용자에게 알릴 길이 없다 —
+     * 몇 번 더 해 보고, 그래도 안 되면 행에 표시를 남긴다.
+     *
+     * @param retryCount   최초 시도가 실패한 뒤 더 해 보는 횟수. 총 시도는 이 값 + 1 이다
+     * @param retryInterval 재시도 사이 간격. 일시적인 장애가 지나갈 만큼만 기다린다
+     */
+    public record Upload(int retryCount, Duration retryInterval) {
+    }
 
     public boolean useLocal() {
         return bucket == null || bucket.isBlank();
