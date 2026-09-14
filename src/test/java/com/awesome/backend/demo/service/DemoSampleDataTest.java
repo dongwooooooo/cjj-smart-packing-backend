@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.awesome.backend.demo.entity.DemoProduct;
 import com.awesome.backend.orders.packing.BlockFactory;
 import com.awesome.backend.orders.packing.BoxSpec;
+import com.awesome.backend.orders.packing.CarrierLimits;
 import com.awesome.backend.orders.packing.CatalogBox;
 import com.awesome.backend.orders.packing.Cartonizer;
+import com.awesome.backend.orders.packing.RateTable;
 import com.awesome.backend.orders.packing.PackItem;
 import com.awesome.backend.orders.packing.PackingEngine;
 import com.awesome.backend.orders.packing.ShipmentPlan;
@@ -44,7 +46,16 @@ class DemoSampleDataTest {
 
     private final DemoDataLoader loader = new DemoDataLoader();
     private final BlockFactory blockFactory = new BlockFactory(1.0);
-    private final Cartonizer cartonizer = new Cartonizer(new PackingEngine(3.0));
+    // V13 seed·application.yml과 같은 요금표·접수 한도
+    private static final RateTable RATES = new RateTable(List.of(
+            new RateTable.Tier(1, "극소형", 80, 2, 5000),
+            new RateTable.Tier(2, "소형", 100, 5, 6000),
+            new RateTable.Tier(3, "중형", 120, 10, 7000),
+            new RateTable.Tier(4, "대형", 140, 15, 8000),
+            new RateTable.Tier(5, "특대형", 160, 20, 9000)));
+
+    private final Cartonizer cartonizer =
+            new Cartonizer(new PackingEngine(3.0), new CarrierLimits(160.0, 100.0, 20.0));
 
     @Test
     void 두_풀에_시연할_만큼의_상품이_들어_있다() {
@@ -143,7 +154,7 @@ class DemoSampleDataTest {
                     product.heightCm().doubleValue(), product.weightKg().doubleValue(),
                     product.fragile(), product.irregular(), item.path("qty").asInt()));
         }
-        return cartonizer.cartonize(items, CATALOG);
+        return cartonizer.cartonize(items, CATALOG, RATES);
     }
 
     private Map<String, DemoProductSpec> productsByGtin() {

@@ -7,8 +7,10 @@ import com.awesome.backend.orders.packing.CatalogBox;
 import com.awesome.backend.orders.packing.Cartonizer;
 import com.awesome.backend.orders.packing.BoxSpec;
 import com.awesome.backend.orders.packing.PackItem;
+import com.awesome.backend.orders.packing.RateTable;
 import com.awesome.backend.orders.packing.ShipmentPlan;
 import com.awesome.backend.outbound.repository.BoxTypeRepository;
+import com.awesome.backend.outbound.repository.ShippingRateTierRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,15 +31,18 @@ public class PackingPlanner {
 
     private final ProductRepository productRepository;
     private final BoxTypeRepository boxTypeRepository;
+    private final ShippingRateTierRepository shippingRateTierRepository;
     private final BlockFactory blockFactory;
     private final Cartonizer cartonizer;
     private final PackingProperties properties;
 
     public PackingPlanner(ProductRepository productRepository, BoxTypeRepository boxTypeRepository,
+                          ShippingRateTierRepository shippingRateTierRepository,
                           BlockFactory blockFactory, Cartonizer cartonizer,
                           PackingProperties properties) {
         this.productRepository = productRepository;
         this.boxTypeRepository = boxTypeRepository;
+        this.shippingRateTierRepository = shippingRateTierRepository;
         this.blockFactory = blockFactory;
         this.cartonizer = cartonizer;
         this.properties = properties;
@@ -60,18 +65,25 @@ public class PackingPlanner {
                         box.tareWeightKg().doubleValue(),
                         properties.boardThicknessCm()))
                 .toList();
-        return new Plans(products, catalog);
+        RateTable rates = new RateTable(shippingRateTierRepository.findAll().stream()
+                .map(tier -> new RateTable.Tier(tier.rank(), tier.name(),
+                        tier.maxSumCm().doubleValue(), tier.maxWeightKg().doubleValue(),
+                        tier.priceKrw()))
+                .toList());
+        return new Plans(products, catalog, rates);
     }
 
-    /** 한 배치 동안 고정된 상품·카탈로그 위에서 주문별 편성을 돌린다. */
+    /** 한 배치 동안 고정된 상품·카탈로그·요금표 위에서 주문별 편성을 돌린다. */
     public final class Plans {
 
         private final Map<String, Product> products;
         private final List<CatalogBox> catalog;
+        private final RateTable rates;
 
-        private Plans(Map<String, Product> products, List<CatalogBox> catalog) {
+        private Plans(Map<String, Product> products, List<CatalogBox> catalog, RateTable rates) {
             this.products = products;
             this.catalog = catalog;
+            this.rates = rates;
         }
 
         /** 초과 치수 낱개가 있으면 OversizedItemException. 호출자가 주문 거부로 옮긴다. */
@@ -83,7 +95,7 @@ public class PackingPlanner {
                         cm(product.widthCm()), cm(product.lengthCm()), cm(product.heightCm()),
                         weightKg(product), product.fragile(), product.irregular(), line.qty()));
             }
-            return cartonizer.cartonize(items, catalog);
+            return cartonizer.cartonize(items, catalog, rates);
         }
 
         public long productId(String gtin) {

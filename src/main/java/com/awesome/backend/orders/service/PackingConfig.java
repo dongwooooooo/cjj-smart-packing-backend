@@ -1,6 +1,7 @@
 package com.awesome.backend.orders.service;
 
 import com.awesome.backend.orders.packing.BlockFactory;
+import com.awesome.backend.orders.packing.CarrierLimits;
 import com.awesome.backend.orders.packing.Cartonizer;
 import com.awesome.backend.orders.packing.PackingEngine;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -26,7 +27,13 @@ public class PackingConfig {
     }
 
     @Bean
-    public Cartonizer cartonizer(PackingEngine packingEngine) {
-        return new Cartonizer(packingEngine);
+    public CarrierLimits carrierLimits(PackingProperties properties) {
+        PackingProperties.Carrier carrier = properties.carrier();
+        return new CarrierLimits(carrier.maxSumCm(), carrier.maxLongestCm(), carrier.maxWeightKg());
+    }
+
+    @Bean
+    public Cartonizer cartonizer(PackingEngine packingEngine, CarrierLimits carrierLimits) {
+        return new Cartonizer(packingEngine, carrierLimits);
     }
 }

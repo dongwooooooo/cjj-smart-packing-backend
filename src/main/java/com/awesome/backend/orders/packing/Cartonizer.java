@@ -3,20 +3,32 @@ package com.awesome.backend.orders.packing;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.OptionalLong;
 
 /**
  * 편성 최적화 (docs/orders-import-spec.md §4-3).
- * 목적함수: 박스 개수 최소, 동점이면 총 부피 최소.
+ *
+ * <p>목적함수: 총 배송비 최소 → 동점이면 박스 개수 최소 → 동점이면 총 부피 최소.
+ * 택배 요금은 세 변의 합 구간과 무게 구간 중 높은 쪽으로 정해지므로, 무게를 빼고 박스 개수만
+ * 세면 요금이 한 구간 올라가는 편성을 최적이라고 낸다.
  */
 public class Cartonizer {
 
-    private final PackingEngine engine;
+    /**
+     * 요금 미확정 구간(price_krw NULL)에 걸린 배송단위의 요금. 비교에서 가장 비싼 것으로 둔다 —
+     * 값을 지어내면 근거 없는 선호가 생기고, 0으로 두면 미확정 구간을 골라버린다.
+     */
+    private static final long UNPRICED = Long.MAX_VALUE;
 
-    public Cartonizer(PackingEngine engine) {
+    private final PackingEngine engine;
+    private final CarrierLimits limits;
+
+    public Cartonizer(PackingEngine engine, CarrierLimits limits) {
         this.engine = engine;
+        this.limits = limits;
     }
 
-    public List<ShipmentPlan> cartonize(List<PackItem> items, List<CatalogBox> catalog) {
+    public List<ShipmentPlan> cartonize(List<PackItem> items, List<CatalogBox> catalog, RateTable rates) {
         if (catalog.isEmpty()) {
             // 설정 오류 — 비즈니스 거부(OVERSIZED_ITEM)와 섞이면 안 된다
             throw new IllegalArgumentException("box catalog is empty");
@@ -27,7 +39,7 @@ public class Cartonizer {
 
         // 초과 치수 선검사: 어떤 박스에도 안 들어가는 낱개가 있으면 주문 거부
         for (PackItem item : items) {
-            if (minBox(List.of(item), ascending) == null) {
+            if (minBox(List.of(item), ascending, rates) == null) {
                 throw new OversizedItemException(item.gtin());
             }
         }
@@ -36,7 +48,7 @@ public class Cartonizer {
         List<ShipmentPlan> plans = new ArrayList<>();
         List<PackItem> regular = items.stream().filter(i -> !i.nonStackable()).toList();
         if (!regular.isEmpty()) {
-            plans.addAll(cartonizeGroup(regular, ascending));
+            plans.addAll(cartonizeGroup(regular, ascending, rates));
         }
         items.stream().filter(PackItem::nonStackable)
                 .map(PackItem::gtin).distinct().sorted()
@@ -44,48 +56,58 @@ public class Cartonizer {
                         items.stream()
                                 .filter(i -> i.nonStackable() && i.gtin().equals(gtin))
                                 .toList(),
-                        ascending)));
+                        ascending, rates)));
         return plans;
     }
 
-    private List<ShipmentPlan> cartonizeGroup(List<PackItem> group, List<CatalogBox> ascending) {
-        // 통째 시도: 전체가 박스 1개에 들어가면 그 최소 박스가 곧 최적
-        CatalogBox whole = minBox(group, ascending);
-        if (whole != null) {
-            return List.of(ShipmentPlan.of(whole.id(), List.copyOf(group)));
+    private List<ShipmentPlan> cartonizeGroup(List<PackItem> group, List<CatalogBox> ascending,
+                                              RateTable rates) {
+        // 통째 시도: 전체가 박스 1개에 들어가면 그것이 후보 하나다. 박스 개수는 1로 최소지만
+        // 요금까지 최소라는 보장이 없어(무게가 구간을 올릴 수 있다) 분할 후보와 비교한다.
+        List<List<PackItem>> best = null;
+        if (minBox(group, ascending, rates) != null) {
+            best = List.of(group);
         }
 
-        List<List<PackItem>> units = firstFitDecreasing(group, ascending);
-        units = improveByMoves(units, ascending);
+        List<List<PackItem>> split = improveByMoves(
+                firstFitDecreasing(group, ascending, rates), ascending, rates);
+        if (best == null || cost(split, ascending, rates).compareTo(cost(best, ascending, rates)) < 0) {
+            best = split;
+        }
+
         List<ShipmentPlan> plans = new ArrayList<>();
-        for (List<PackItem> unit : units) {
-            plans.add(ShipmentPlan.of(minBox(unit, ascending).id(), unit));
+        for (List<PackItem> unit : best) {
+            plans.add(ShipmentPlan.of(minBox(unit, ascending, rates).id(), unit));
         }
         return plans;
     }
 
     /**
-     * 국소 탐색: 낱개 하나를 다른 배송단위로 옮겨보고, 목적함수
-     * (박스 개수, 동점이면 총 부피)가 좋아지는 이동만 채택. 개선이 없으면 종료.
+     * 국소 탐색: 낱개 하나를 다른 배송단위(또는 새 배송단위)로 옮겨보고, 목적함수가 좋아지는
+     * 이동만 채택. 개선이 없으면 종료.
+     *
+     * <p>새 배송단위로의 이동까지 보는 이유: 무게 때문에 요금 구간이 올라간 단위는 쪼개는 쪽이
+     * 쌀 수 있는데, 기존 단위 사이의 이동만으로는 단위가 늘어나지 않아 그 편성에 닿지 못한다.
+     * 채택 조건이 목적함수뿐이라 쪼개는 쪽이 비싸지면 그대로 기각된다.
      */
-    private List<List<PackItem>> improveByMoves(List<List<PackItem>> units, List<CatalogBox> ascending) {
+    private List<List<PackItem>> improveByMoves(List<List<PackItem>> units, List<CatalogBox> ascending,
+                                                RateTable rates) {
         boolean improved = true;
         while (improved) {
             improved = false;
-            long currentCost = totalVolume(units, ascending);
+            PlanCost currentCost = cost(units, ascending, rates);
             outer:
             for (int from = 0; from < units.size(); from++) {
-                for (int to = 0; to < units.size(); to++) {
+                for (int to = 0; to <= units.size(); to++) {
                     if (from == to) {
                         continue;
                     }
                     for (int i = 0; i < units.get(from).size(); i++) {
-                        List<List<PackItem>> moved = move(units, from, to, i, ascending);
+                        List<List<PackItem>> moved = move(units, from, to, i, ascending, rates);
                         if (moved == null) {
                             continue;
                         }
-                        boolean fewerUnits = moved.size() < units.size();
-                        if (fewerUnits || totalVolume(moved, ascending) < currentCost) {
+                        if (cost(moved, ascending, rates).compareTo(currentCost) < 0) {
                             units = moved;
                             improved = true;
                             break outer;
@@ -97,12 +119,20 @@ public class Cartonizer {
         return units;
     }
 
-    /** from 단위의 i번째 낱개를 to 단위로 옮긴 새 편성. to가 수용 불가면 null. */
+    /**
+     * from 단위의 i번째 낱개를 to 단위로 옮긴 새 편성. to가 units.size()면 새 단위로 옮긴다.
+     * to가 수용 불가면 null.
+     */
     private List<List<PackItem>> move(List<List<PackItem>> units, int from, int to, int i,
-                                      List<CatalogBox> ascending) {
-        List<PackItem> target = new ArrayList<>(units.get(to));
+                                      List<CatalogBox> ascending, RateTable rates) {
+        boolean newUnit = to == units.size();
+        if (newUnit && units.get(from).size() == 1) {
+            // 단위 하나짜리를 통째로 새 단위에 옮기면 같은 편성이 된다 — 무한 반복 방지
+            return null;
+        }
+        List<PackItem> target = newUnit ? new ArrayList<>() : new ArrayList<>(units.get(to));
         target.add(units.get(from).get(i));
-        if (minBox(target, ascending) == null) {
+        if (minBox(target, ascending, rates) == null) {
             return null;
         }
         List<List<PackItem>> result = new ArrayList<>();
@@ -119,30 +149,73 @@ public class Cartonizer {
                 result.add(units.get(u));
             }
         }
+        if (newUnit) {
+            result.add(target);
+        }
         return result;
     }
 
-    private long totalVolume(List<List<PackItem>> units, List<CatalogBox> ascending) {
-        long sum = 0;
+    /** 편성 하나의 비용 — 사전식 비교용 (총 요금, 박스 개수, 총 부피). */
+    private PlanCost cost(List<List<PackItem>> units, List<CatalogBox> ascending, RateTable rates) {
+        long fare = 0;
+        long volume = 0;
         for (List<PackItem> unit : units) {
-            sum += minBox(unit, ascending).innerVolumeMm3();
+            CatalogBox box = minBox(unit, ascending, rates);
+            fare = plus(fare, fareOf(box, unit, rates));
+            volume += box.innerVolumeMm3();
         }
-        return sum;
+        return new PlanCost(fare, units.size(), volume);
     }
 
-    /** 오름차순 카탈로그에서 이 낱개들을 수용하는 첫(=최소) 박스. 없으면 null. */
-    private CatalogBox minBox(List<PackItem> unit, List<CatalogBox> ascending) {
-        List<Block> blocks = unit.stream().map(PackItem::block).toList();
+    /** 요금 미확정(UNPRICED)이 섞이면 합계도 미확정이다 — 넘침 없이 그대로 유지한다. */
+    private static long plus(long a, long b) {
+        return (a == UNPRICED || b == UNPRICED) ? UNPRICED : a + b;
+    }
+
+    private long fareOf(CatalogBox box, List<PackItem> unit, RateTable rates) {
+        OptionalLong fare = rates.fareKrw(box.outerSumCm(), totalWeightKg(unit, box));
+        return fare.orElse(UNPRICED);
+    }
+
+    /** 배송단위 총무게 = Σ상품 무게 + 박스 자체 무게. */
+    private static double totalWeightKg(List<PackItem> unit, CatalogBox box) {
+        return unit.stream().mapToDouble(PackItem::weightKg).sum() + box.tareWeightKg();
+    }
+
+    /**
+     * 이 낱개들을 담을 수 있는 박스 중 요금 최소, 동점이면 부피 최소. 없으면 null.
+     *
+     * <p>담을 수 있다 = 배치 엔진이 수용 판정 + 택배사 접수 한도(세변합·최장변·총무게) 통과.
+     */
+    private CatalogBox minBox(List<PackItem> unit, List<CatalogBox> ascending, RateTable rates) {
+        CatalogBox best = null;
+        long bestFare = 0;
         for (CatalogBox box : ascending) {
-            if (engine.canPack(blocks, box.spec())) {
-                return box;
+            if (!fits(unit, box)) {
+                continue;
+            }
+            long fare = fareOf(box, unit, rates);
+            // 오름차순 순회라 요금이 같으면 먼저 만난 쪽이 부피가 작다
+            if (best == null || fare < bestFare) {
+                best = box;
+                bestFare = fare;
             }
         }
-        return null;
+        return best;
+    }
+
+    /** 치수만으로 이 박스에 들어가는가 — 접수 한도는 보지 않는다. */
+    private boolean fitsDimensions(List<PackItem> unit, CatalogBox box) {
+        return engine.canPack(unit.stream().map(PackItem::block).toList(), box.spec());
+    }
+
+    private boolean fits(List<PackItem> unit, CatalogBox box) {
+        return fitsDimensions(unit, box) && limits.allows(box, totalWeightKg(unit, box));
     }
 
     /** 부피 내림차순(동률이면 GTIN 순)으로, 수용 가능한 첫 배송단위에 배치. */
-    private List<List<PackItem>> firstFitDecreasing(List<PackItem> items, List<CatalogBox> ascending) {
+    private List<List<PackItem>> firstFitDecreasing(List<PackItem> items, List<CatalogBox> ascending,
+                                                    RateTable rates) {
         List<PackItem> sorted = items.stream()
                 .sorted(Comparator.comparingLong(Cartonizer::volume).reversed()
                         .thenComparing(PackItem::gtin))
@@ -154,7 +227,7 @@ public class Cartonizer {
             for (List<PackItem> unit : units) {
                 List<PackItem> candidate = new ArrayList<>(unit);
                 candidate.add(item);
-                if (minBox(candidate, ascending) != null) {
+                if (minBox(candidate, ascending, rates) != null) {
                     target = unit;
                     break;
                 }
@@ -173,5 +246,16 @@ public class Cartonizer {
     private static long volume(PackItem item) {
         Block b = item.block();
         return (long) b.widthMm() * b.lengthMm() * b.heightMm();
+    }
+
+    private record PlanCost(long fareKrw, int units, long volumeMm3) implements Comparable<PlanCost> {
+
+        @Override
+        public int compareTo(PlanCost other) {
+            return Comparator.comparingLong(PlanCost::fareKrw)
+                    .thenComparingInt(PlanCost::units)
+                    .thenComparingLong(PlanCost::volumeMm3)
+                    .compare(this, other);
+        }
     }
 }
