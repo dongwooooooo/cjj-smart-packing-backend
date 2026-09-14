@@ -32,6 +32,12 @@ public class PackingConfig {
         return new CarrierLimits(carrier.maxSumCm(), carrier.maxLongestCm(), carrier.maxWeightKg());
     }
 
+    /** 출고 무게 검수(outbound)가 쓰는 허용 오차. packing.* 설정에 묶여 있어 여기서 노출한다. */
+    @Bean
+    public PackingProperties.WeightCheck weightCheck(PackingProperties properties) {
+        return properties.weightCheck();
+    }
+
     @Bean
     public Cartonizer cartonizer(PackingEngine packingEngine, CarrierLimits carrierLimits) {
         return new Cartonizer(packingEngine, carrierLimits);

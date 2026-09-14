@@ -102,7 +102,8 @@ public class DemoPrepacker {
 
         try {
             toteScanService.scan(barcode.get());
-            completeService.complete(shipment.id());
+            // 미리 포장은 저울을 쓰지 않는다 — 잰 무게 없이 호출해 검수를 건너뛴다
+            completeService.complete(shipment.id(), null);
             return true;
         } catch (RuntimeException e) {
             log.warn("미리 포장을 건너뛴다. shipmentId={} 이유={}", shipment.id(), e.toString());
