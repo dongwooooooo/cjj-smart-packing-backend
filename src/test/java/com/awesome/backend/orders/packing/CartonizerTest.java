@@ -9,16 +9,22 @@ class CartonizerTest {
 
     // 우체국 소포 1~5호 = A~E호 (V2 seed와 동일)
     private static final List<CatalogBox> CATALOG = List.of(
-            new CatalogBox(1, BoxSpec.ofCm(22, 19, 9)),
-            new CatalogBox(2, BoxSpec.ofCm(27, 18, 15)),
-            new CatalogBox(3, BoxSpec.ofCm(34, 25, 21)),
-            new CatalogBox(4, BoxSpec.ofCm(41, 31, 28)),
-            new CatalogBox(5, BoxSpec.ofCm(48, 38, 34)));
+            box(1, 22, 19, 9), box(2, 27, 18, 15), box(3, 34, 25, 21),
+            box(4, 41, 31, 28), box(5, 48, 38, 34));
+
+    private static CatalogBox box(long id, double w, double l, double h) {
+        // 판두께 0.5cm, 박스 자체 무게 0kg (V13 seed와 같은 잠정값)
+        return CatalogBox.of(id, BoxSpec.ofCm(w, l, h), 0.0, 0.5);
+    }
 
     private final Cartonizer cartonizer = new Cartonizer(new PackingEngine(3.0));
 
     private static PackItem item(String gtin, double w, double l, double h) {
-        return new PackItem(gtin, Block.ofCm(w, l, h), false, false);
+        return item(gtin, w, l, h, 0.0);
+    }
+
+    private static PackItem item(String gtin, double w, double l, double h, double weightKg) {
+        return new PackItem(gtin, Block.ofCm(w, l, h), weightKg, false, false);
     }
 
     @Test
@@ -48,7 +54,7 @@ class CartonizerTest {
     @Test
     void 적층불가_상품은_일반_상품과_배송단위를_분리한다() {
         // 전부 한 박스에 들어가는 크기지만 적층불가라 분리돼야 한다
-        PackItem irregular = new PackItem("8803", Block.ofCm(10, 10, 5), false, true);
+        PackItem irregular = new PackItem("8803", Block.ofCm(10, 10, 5), 0.0, false, true);
         PackItem normal = item("8804", 10, 10, 5);
 
         List<ShipmentPlan> plans = cartonizer.cartonize(List.of(irregular, normal), CATALOG);
@@ -58,8 +64,8 @@ class CartonizerTest {
 
     @Test
     void 같은_적층불가_상품끼리는_한_배송단위를_허용한다() {
-        PackItem a = new PackItem("8803", Block.ofCm(10, 10, 5), false, true);
-        PackItem b = new PackItem("8803", Block.ofCm(10, 10, 5), false, true);
+        PackItem a = new PackItem("8803", Block.ofCm(10, 10, 5), 0.0, false, true);
+        PackItem b = new PackItem("8803", Block.ofCm(10, 10, 5), 0.0, false, true);
 
         List<ShipmentPlan> plans = cartonizer.cartonize(List.of(a, b), CATALOG);
 
@@ -85,7 +91,7 @@ class CartonizerTest {
 
     @Test
     void 파손주의_상품이_있는_배송단위만_완충재를_권유한다() {
-        PackItem fragile = new PackItem("8809", Block.ofCm(10, 10, 5), true, false);
+        PackItem fragile = new PackItem("8809", Block.ofCm(10, 10, 5), 0.0, true, false);
         PackItem normal = item("8810", 40.5, 30.5, 28); // 어느 축에도 5cm 틈이 안 남아 분리됨
 
         List<ShipmentPlan> plans = cartonizer.cartonize(List.of(fragile, normal), CATALOG);

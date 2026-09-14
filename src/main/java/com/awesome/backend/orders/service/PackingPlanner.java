@@ -31,13 +31,16 @@ public class PackingPlanner {
     private final BoxTypeRepository boxTypeRepository;
     private final BlockFactory blockFactory;
     private final Cartonizer cartonizer;
+    private final PackingProperties properties;
 
     public PackingPlanner(ProductRepository productRepository, BoxTypeRepository boxTypeRepository,
-                          BlockFactory blockFactory, Cartonizer cartonizer) {
+                          BlockFactory blockFactory, Cartonizer cartonizer,
+                          PackingProperties properties) {
         this.productRepository = productRepository;
         this.boxTypeRepository = boxTypeRepository;
         this.blockFactory = blockFactory;
         this.cartonizer = cartonizer;
+        this.properties = properties;
     }
 
     @Transactional(readOnly = true)
@@ -50,10 +53,12 @@ public class PackingPlanner {
         Map<String, Product> products = productRepository.findByGtinIn(gtins).stream()
                 .collect(Collectors.toMap(Product::gtin, Function.identity()));
         List<CatalogBox> catalog = boxTypeRepository.findAll().stream()
-                .map(box -> new CatalogBox(box.id(), BoxSpec.ofCm(
-                        box.innerWidthCm().doubleValue(),
-                        box.innerLengthCm().doubleValue(),
-                        box.innerHeightCm().doubleValue())))
+                .map(box -> CatalogBox.of(box.id(), BoxSpec.ofCm(
+                                box.innerWidthCm().doubleValue(),
+                                box.innerLengthCm().doubleValue(),
+                                box.innerHeightCm().doubleValue()),
+                        box.tareWeightKg().doubleValue(),
+                        properties.boardThicknessCm()))
                 .toList();
         return new Plans(products, catalog);
     }
@@ -76,7 +81,7 @@ public class PackingPlanner {
                 Product product = products.get(line.gtin());
                 items.addAll(blockFactory.toItems(product.gtin(),
                         cm(product.widthCm()), cm(product.lengthCm()), cm(product.heightCm()),
-                        product.fragile(), product.irregular(), line.qty()));
+                        weightKg(product), product.fragile(), product.irregular(), line.qty()));
             }
             return cartonizer.cartonize(items, catalog);
         }
@@ -87,6 +92,14 @@ public class PackingPlanner {
 
         private double cm(BigDecimal value) {
             return value.doubleValue();
+        }
+
+        /**
+         * 무게 미등록 상품은 0kg으로 본다. 접수는 치수 확정(dim_status=CONFIRMED)만 통과시키지만
+         * 무게는 별도 컬럼이라 비어 있을 수 있다 — 이 경우 요금이 실제보다 낮게 잡힌다.
+         */
+        private double weightKg(Product product) {
+            return product.weightKg() == null ? 0.0 : product.weightKg().doubleValue();
         }
     }
 }

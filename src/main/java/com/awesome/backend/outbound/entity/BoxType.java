@@ -31,6 +31,10 @@ public class BoxType {
     @Column(name = "stock_qty", nullable = false)
     private int stockQty;
 
+    /** 박스 자체 무게. 배송단위 총무게 = Σ상품 무게 + 이 값 (V13). */
+    @Column(name = "tare_weight_kg", nullable = false)
+    private BigDecimal tareWeightKg;
+
     protected BoxType() {
     }
 
@@ -56,6 +60,10 @@ public class BoxType {
 
     public int stockQty() {
         return stockQty;
+    }
+
+    public BigDecimal tareWeightKg() {
+        return tareWeightKg;
     }
 
     public void decreaseStock() {

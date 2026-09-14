@@ -34,12 +34,13 @@ class DemoSampleDataTest {
 
     // seed의 박스 A~F호 내치수 (V2 + V12)
     private static final List<CatalogBox> CATALOG = List.of(
-            new CatalogBox(1, BoxSpec.ofCm(22.0, 19.0, 9.0)),
-            new CatalogBox(2, BoxSpec.ofCm(27.0, 18.0, 15.0)),
-            new CatalogBox(3, BoxSpec.ofCm(34.0, 25.0, 21.0)),
-            new CatalogBox(4, BoxSpec.ofCm(41.0, 31.0, 28.0)),
-            new CatalogBox(5, BoxSpec.ofCm(48.0, 38.0, 34.0)),
-            new CatalogBox(6, BoxSpec.ofCm(52.0, 48.0, 40.0)));
+            box(1, 22.0, 19.0, 9.0), box(2, 27.0, 18.0, 15.0), box(3, 34.0, 25.0, 21.0),
+            box(4, 41.0, 31.0, 28.0), box(5, 48.0, 38.0, 34.0), box(6, 52.0, 48.0, 40.0));
+
+    private static CatalogBox box(long id, double w, double l, double h) {
+        // 판두께 0.5cm, 박스 자체 무게 0kg — application.yml·V13 seed와 같은 값
+        return CatalogBox.of(id, BoxSpec.ofCm(w, l, h), 0.0, 0.5);
+    }
 
     private final DemoDataLoader loader = new DemoDataLoader();
     private final BlockFactory blockFactory = new BlockFactory(1.0);
@@ -139,7 +140,7 @@ class DemoSampleDataTest {
             DemoProductSpec product = byGtin.get(item.path("gtin").asText());
             items.addAll(blockFactory.toItems(product.gtin(),
                     product.widthCm().doubleValue(), product.lengthCm().doubleValue(),
-                    product.heightCm().doubleValue(),
+                    product.heightCm().doubleValue(), product.weightKg().doubleValue(),
                     product.fragile(), product.irregular(), item.path("qty").asInt()));
         }
         return cartonizer.cartonize(items, CATALOG);

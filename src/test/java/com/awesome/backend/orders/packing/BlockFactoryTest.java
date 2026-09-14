@@ -12,7 +12,7 @@ class BlockFactoryTest {
 
     @Test
     void 파손주의_상품은_각_변에_완충재_두께_양쪽만큼_커진다() {
-        List<PackItem> items = factory.toItems("8801", 23, 14, 11, true, false, 1);
+        List<PackItem> items = factory.toItems("8801", 23, 14, 11, 1.08, true, false, 1);
 
         assertThat(items).hasSize(1);
         Block block = items.get(0).block();
@@ -21,21 +21,24 @@ class BlockFactoryTest {
         assertThat(block.heightMm()).isEqualTo(130);
         // 파손주의 여부는 완충재 권유 표시의 원천 — 버리면 안 된다
         assertThat(items.get(0).fragile()).isTrue();
+        // 무게는 요금 구간 판정의 한 축 — 완충재 패딩과 무관하게 상품 무게 그대로 실린다
+        assertThat(items.get(0).weightKg()).isEqualTo(1.08);
     }
 
     @Test
     void 수량_0이면_낱개를_만들지_않는다() {
-        assertThat(factory.toItems("8803", 10, 10, 10, false, false, 0)).isEmpty();
+        assertThat(factory.toItems("8803", 10, 10, 10, 0.5, false, false, 0)).isEmpty();
     }
 
     @Test
     void 일반_상품은_치수_그대로_수량만큼_낱개를_만든다() {
-        List<PackItem> items = factory.toItems("8802", 20, 15, 5, false, true, 3);
+        List<PackItem> items = factory.toItems("8802", 20, 15, 5, 0.6, false, true, 3);
 
         assertThat(items).hasSize(3);
         assertThat(items).allSatisfy(item -> {
             assertThat(item.block()).isEqualTo(Block.ofCm(20, 15, 5));
             assertThat(item.nonStackable()).isTrue();
+            assertThat(item.weightKg()).isEqualTo(0.6);
             assertThat(item.gtin()).isEqualTo("8802");
         });
     }
