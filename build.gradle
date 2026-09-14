@@ -42,5 +42,24 @@ dependencies {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    // 벤치마크는 기본 테스트에서 뺀다 — 수 분이 걸리고 통과·실패를 가리지 않는다
+    useJUnitPlatform {
+        excludeTags 'benchmark'
+    }
+}
+
+// 편성 시간 측정 전용. ./gradlew benchmark
+tasks.register('benchmark', Test) {
+    description = '카토나이제이션 확장성 벤치마크 (@Tag("benchmark"))'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'benchmark'
+    }
+    // 측정값은 매번 다르므로 캐시된 결과를 재사용하지 않는다
+    outputs.upToDateWhen { false }
+    testLogging {
+        showStandardStreams = true
+    }
 }
