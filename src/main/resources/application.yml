@@ -53,6 +53,11 @@ storage:
   presign-ttl: ${STORAGE_PRESIGN_TTL:30m}
   local-base-path: ${STORAGE_LOCAL_PATH:./demo/data}
   local-url-prefix: /files/m/
+  # 로컬 측정용. MinIO 같은 S3 호환 저장소 주소(예: http://minio:9000). 비우면 실제 AWS
+  endpoint-override: ${STORAGE_ENDPOINT_OVERRIDE:}
+  # 엔드포인트 오버라이드에서만 쓴다. 실 AWS 는 인스턴스 프로파일로 인증한다 (D-24)
+  access-key: ${STORAGE_ACCESS_KEY:}
+  secret-key: ${STORAGE_SECRET_KEY:}
 
 inference:
   # Lambda 함수 이름(별칭 포함, 예: logistics-dimension-api:live). 비우면 mock (D-04, D-24)
