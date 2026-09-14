@@ -42,7 +42,7 @@ src/main/java/com/awesome/backend/
   inbound/          P1 입고 도메인 (스캔·측정·수량입고)
   outbound/         P2 출고 포장 도메인 (토트 스캔·포장완료)
   orders/           P3 출고지시·주문 도메인
-    packing/        카토나이제이션 — PackingEngine(배치 판정), Cartonizer(편성), BlockFactory
+    packing/        카토나이제이션 — PackingEngine(배치 판정), Cartonizer(편성), BlockFactory, RateTable(요금 구간)
   inventory/        재고 도메인 (증감·조회 — InventoryService 창구)
   dashboard/        관리자 대시보드 (2차 MVP)
 
@@ -53,12 +53,13 @@ src/main/java/com/awesome/backend/
 | 도메인 | 엔티티 (V1 테이블) | 비고 |
 | --- | --- | --- |
 | inbound (P1) | Product · 추후 KoreanNetMaster, Category, CategoryAttributeMap, MeasurementSession, MeasurementImage | Product는 P3가 읽기 컬럼+재고 캐시만 매핑한 축소판 — P1이 확장·인수 |
-| outbound (P2) | Shipment, ShipmentItem, Tote, ToteAssignment, BoxType | 생성은 P3 import가 하지만 소유·확장은 P2 |
+| outbound (P2) | Shipment, ShipmentItem, Tote, ToteAssignment, BoxType, ShippingRateTier | 생성은 P3 import가 하지만 소유·확장은 P2 |
 | orders (P3) | Order(orders), OrderItem, Region, Line | |
 | inventory (P3) | InventoryTx | 재고 증감·조회는 InventoryService 창구로만 |
 src/main/resources/db/migration/
   V1__schema.sql    ERD v0.3 전체 16 테이블
   V2__seed.sql      Phase 1 seed — category, region·line 3개, box_type A~E호, tote, 시연 상품 무게 매핑 (D-10)
+  V13__...sql       택배 요금 구간표(shipping_rate_tier) + box_type.tare_weight_kg (docs/decisions-weight.md)
 ```
 
 - 스키마 변경은 Flyway 마이그레이션 추가로만 하고, P3 리뷰 후 병합한다 (docs/05 §3).
