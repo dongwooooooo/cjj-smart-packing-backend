@@ -10,9 +10,12 @@ public record CarrierLimits(double maxSumCm, double maxLongestCm, double maxWeig
 
     /** 이 박스에 총무게 weightKg을 담은 배송단위가 접수 한도 안에 있는가. */
     public boolean allows(CatalogBox box, double weightKg) {
-        return box.outerSumCm() <= maxSumCm
-                && box.outerLongestCm() <= maxLongestCm
-                && weightKg <= maxWeightKg;
+        return allowsDimensions(box) && allowsWeight(weightKg);
+    }
+
+    /** 무게를 빼고 이 박스의 외치수만 한도 안인가. */
+    public boolean allowsDimensions(CatalogBox box) {
+        return box.outerSumCm() <= maxSumCm && box.outerLongestCm() <= maxLongestCm;
     }
 
     public boolean allowsWeight(double weightKg) {

@@ -12,6 +12,9 @@ public enum RejectionReason {
     /** 낱개 하나가 어떤 박스에도 안 들어감 (§4-3 선검사). U3에서 붙는다. */
     OVERSIZED_ITEM,
 
+    /** 낱개 하나가 택배사 접수 무게 한도를 넘음 (§4-3 선검사). 나눠 담아도 해결되지 않는다. */
+    OVERWEIGHT_ITEM,
+
     /** 배송지역에 활성 라인이 없음 (§5). U3에서 붙는다. */
     NO_ACTIVE_LINE
 }

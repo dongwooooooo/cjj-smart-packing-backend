@@ -37,11 +37,19 @@ public class Cartonizer {
                 .sorted(Comparator.comparingLong(CatalogBox::innerVolumeMm3))
                 .toList();
 
-        // 초과 치수 선검사: 어떤 박스에도 안 들어가는 낱개가 있으면 주문 거부
+        // 선검사: 낱개 하나가 어느 박스에도 담기지 않으면 나눠도 해결되지 않으므로 주문 거부.
+        // 치수는 담기는데 무게만 걸리는 경우를 가려내 사유를 나눈다.
         for (PackItem item : items) {
-            if (minBox(List.of(item), ascending, rates) == null) {
-                throw new OversizedItemException(item.gtin());
+            List<PackItem> single = List.of(item);
+            if (minBox(single, ascending, rates) != null) {
+                continue;
             }
+            boolean boxAvailable = ascending.stream()
+                    .anyMatch(box -> fitsDimensions(single, box) && limits.allowsDimensions(box));
+            if (boxAvailable) {
+                throw new OverweightItemException(item.gtin(), item.weightKg());
+            }
+            throw new OversizedItemException(item.gtin());
         }
 
         // 적층불가 선분리: 일반 그룹 하나 + 적층불가 GTIN별 그룹 (동거 금지)

@@ -3,6 +3,7 @@ package com.awesome.backend.orders.service;
 import com.awesome.backend.inventory.service.InventoryService;
 import com.awesome.backend.orders.entity.Line;
 import com.awesome.backend.orders.packing.OversizedItemException;
+import com.awesome.backend.orders.packing.OverweightItemException;
 import com.awesome.backend.orders.packing.ShipmentPlan;
 import com.awesome.backend.orders.repository.LineRepository;
 import com.awesome.backend.orders.repository.RegionRepository;
@@ -78,6 +79,10 @@ public class OrderScreener {
                 shipmentPlans = plans.of(order);
             } catch (OversizedItemException e) {
                 rejected.add(reject(order, RejectionReason.OVERSIZED_ITEM, Map.of("gtin", e.gtin())));
+                continue;
+            } catch (OverweightItemException e) {
+                rejected.add(reject(order, RejectionReason.OVERWEIGHT_ITEM,
+                        Map.of("gtin", e.gtin(), "weightKg", e.weightKg())));
                 continue;
             }
             demand.forEach((gtin, qty) -> remainingStock.merge(gtin, -qty, Integer::sum));
