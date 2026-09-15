@@ -67,6 +67,15 @@ storage:
   presign-ttl: ${STORAGE_PRESIGN_TTL:30m}
   local-base-path: ${STORAGE_LOCAL_PATH:./demo/data}
   local-url-prefix: /files/m/
+  # 로컬 측정용. MinIO 같은 S3 호환 저장소 주소(예: http://minio:9000). 비우면 실제 AWS
+  endpoint-override: ${STORAGE_ENDPOINT_OVERRIDE:}
+  # 엔드포인트 오버라이드에서만 쓴다. 실 AWS 는 인스턴스 프로파일로 인증한다 (D-24)
+  access-key: ${STORAGE_ACCESS_KEY:}
+  secret-key: ${STORAGE_SECRET_KEY:}
+  upload:
+    # 사진 업로드는 응답 뒤에 일어난다 — 실패해도 사용자에게 알릴 길이 없어 몇 번 더 해 본다 (D-27)
+    retry-count: ${STORAGE_UPLOAD_RETRY_COUNT:3}
+    retry-interval: ${STORAGE_UPLOAD_RETRY_INTERVAL:1s}
 
 inference:
   # Lambda 함수 이름(별칭 포함, 예: logistics-dimension-api:live). 비우면 mock (D-04, D-24)
@@ -75,6 +84,8 @@ inference:
   api-key: ${INFERENCE_API_KEY:}
   region: ${INFERENCE_AWS_REGION:ap-northeast-2}
   timeout-seconds: ${INFERENCE_TIMEOUT_SECONDS:8}
+  # 로컬 측정용. Lambda RIE 주소(예: http://host.docker.internal:9000). 비우면 실제 AWS
+  endpoint-override: ${INFERENCE_ENDPOINT_OVERRIDE:}
 
   # 신뢰도 게이트 (02 §1-3). 임계값은 아직 명세에 확정된 숫자가 없어 잠정값이다 —
   # 실제 모델 성능을 보고 조정하며, 코드 수정 없이 이 값만 바꾸면 된다.

@@ -2,7 +2,10 @@ package com.awesome.backend.inbound.service;
 
 import com.awesome.backend.demo.repository.DemoProductRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
 import java.time.Duration;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -37,7 +40,7 @@ public class InferenceConfig {
         // 8초 상한은 서버 응답 계약이다 (02 §1-3). SDK 재시도까지 포함한 전체 시간을 여기서 끊는다 —
         // 재시도를 허용하면 콜드스타트 한 번이 두 번이 된다.
         Duration timeout = Duration.ofSeconds(properties.timeoutSeconds());
-        LambdaClient lambda = LambdaClient.builder()
+        var builder = LambdaClient.builder()
                 .region(Region.of(properties.region()))
                 .httpClientBuilder(ApacheHttpClient.builder()
                         .connectionTimeout(CONNECT_TIMEOUT)
@@ -46,8 +49,16 @@ public class InferenceConfig {
                         .apiCallTimeout(timeout)
                         .apiCallAttemptTimeout(timeout)
                         .retryStrategy(b -> b.maxAttempts(1))
-                        .build())
-                .build();
+                        .build());
+        // 로컬 측정: Lambda 컨테이너 이미지를 RIE 로 띄우고 여기로 돌린다. RIE 는 서명을 검증하지
+        // 않지만 SDK 는 자격증명이 있어야 요청을 만들므로 더미를 넣는다.
+        if (properties.hasEndpointOverride()) {
+            log.info("추론 엔드포인트 오버라이드: {}", properties.endpointOverride());
+            builder.endpointOverride(URI.create(properties.endpointOverride()))
+                    .credentialsProvider(StaticCredentialsProvider.create(
+                            AwsBasicCredentials.create("local", "local")));
+        }
+        LambdaClient lambda = builder.build();
 
         // Boot 4 는 Jackson 3 를 자동 구성하고 Jackson 2 ObjectMapper 빈은 없다 — 데모 로더와 같은 방식으로
         // 직접 만든다. 이벤트 JSON 은 HTTP 응답과 무관하니 앱 설정을 공유할 이유도 없다.
