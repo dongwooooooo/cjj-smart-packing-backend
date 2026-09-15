@@ -204,8 +204,10 @@ class MeasurementControllerIT {
                 "$.images[0].url");
 
         // 로컬 보관소는 서버가 직접 서빙한다. S3 모드면 이 주소가 S3 임시 주소가 된다 (D-25).
+        // 업로드는 커밋 뒤 비동기로 일어나므로(D-27) 조회 주소는 응답 직후가 아니라 업로드 완료 뒤에 열린다.
         assertThat(url).startsWith("/files/m/measurements/");
-        mvc.perform(get(url)).andExpect(status().isOk());
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(20))
+                .untilAsserted(() -> mvc.perform(get(url)).andExpect(status().isOk()));
     }
 
     @Test
