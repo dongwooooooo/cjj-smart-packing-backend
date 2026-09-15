@@ -49,10 +49,17 @@ public class ShipmentDetailController {
         return shipmentBoxOverrideService.override(shipmentId, request.boxTypeId());
     }
 
-    /** 포장 완료 처리. docs/02-api-spec.md 3-8. */
+    /**
+     * 포장 완료 처리. docs/02-api-spec.md 3-8.
+     *
+     * <p>본문은 선택이다 — 저울을 쓰지 않는 호출은 본문 없이 그대로 보낸다.
+     */
     @PostMapping("/{shipmentId}/complete")
-    public ShipmentCompleteResponse complete(@PathVariable Long shipmentId) {
-        return shipmentCompleteService.complete(shipmentId);
+    public ShipmentCompleteResponse complete(
+            @PathVariable Long shipmentId,
+            @RequestBody(required = false) ShipmentCompleteRequest request) {
+        return shipmentCompleteService.complete(shipmentId,
+                request == null ? null : request.measuredWeightKg());
     }
 
     @PutMapping("/{shipmentId}/load")

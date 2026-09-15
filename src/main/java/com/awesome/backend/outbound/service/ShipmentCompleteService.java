@@ -16,6 +16,7 @@ import com.awesome.backend.outbound.repository.ShipmentItemRepository;
 import com.awesome.backend.outbound.repository.ShipmentRepository;
 import com.awesome.backend.outbound.repository.ToteAssignmentRepository;
 import com.awesome.backend.outbound.repository.ToteRepository;
+import java.math.BigDecimal;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +43,7 @@ public class ShipmentCompleteService {
     private final BoxTypeRepository boxTypeRepository;
     private final ToteAssignmentRepository toteAssignmentRepository;
     private final ToteRepository toteRepository;
+    private final ShipmentWeightEstimator weightEstimator;
 
     public ShipmentCompleteService(
             ShipmentRepository shipmentRepository,
@@ -50,7 +52,8 @@ public class ShipmentCompleteService {
             StockMovementRecorder stockMovementRecorder,
             BoxTypeRepository boxTypeRepository,
             ToteAssignmentRepository toteAssignmentRepository,
-            ToteRepository toteRepository) {
+            ToteRepository toteRepository,
+            ShipmentWeightEstimator weightEstimator) {
         this.shipmentRepository = shipmentRepository;
         this.shipmentItemRepository = shipmentItemRepository;
         this.productRepository = productRepository;
@@ -58,9 +61,13 @@ public class ShipmentCompleteService {
         this.boxTypeRepository = boxTypeRepository;
         this.toteAssignmentRepository = toteAssignmentRepository;
         this.toteRepository = toteRepository;
+        this.weightEstimator = weightEstimator;
     }
 
-    public ShipmentCompleteResponse complete(Long shipmentId) {
+    /**
+     * @param measuredWeightKg 저울에 올려 잰 무게. null이면 무게 검수를 건너뛴다.
+     */
+    public ShipmentCompleteResponse complete(Long shipmentId, BigDecimal measuredWeightKg) {
         // 1. 조회 — 없으면 404. 이후 모든 단계의 전제.
         Shipment shipment = shipmentRepository.findById(shipmentId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SHIPMENT_NOT_FOUND,
@@ -74,7 +81,14 @@ public class ShipmentCompleteService {
                     "PACKING 상태에서만 포장 완료할 수 있습니다. 현재 상태: " + shipment.status());
         }
 
-        // 3. 상품 재고 차감 — inventory_tx(OUTBOUND_PACKED) 기록과 product.stock_qty 갱신은
+        // 3. 무게 검수 — 잰 무게를 보냈고 예상 무게를 낼 수 있을 때만 본다. 재고를 건드리기 전에
+        // 걸러야 불일치로 막힌 포장이 재고 이력을 남기지 않는다.
+        BigDecimal expectedWeightKg = weightEstimator.expectedKg(shipment).orElse(null);
+        if (measuredWeightKg != null && expectedWeightKg != null) {
+            weightEstimator.verify(expectedWeightKg, measuredWeightKg);
+        }
+
+        // 4. 상품 재고 차감 — inventory_tx(OUTBOUND_PACKED) 기록과 product.stock_qty 갱신은
         // StockMovementRecorder 단일 창구에 위임한다(직접 짜지 않음). 재고 부족이면 이 호출이
         // 곧바로 ApiException(OUT_OF_STOCK)을 던지고, 그 예외가 트랜잭션을 롤백시킨다.
         for (ShipmentItem item : shipmentItemRepository.findByShipmentId(shipmentId)) {
@@ -84,7 +98,7 @@ public class ShipmentCompleteService {
             stockMovementRecorder.recordOutboundPacked(product.gtin(), item.qty(), shipmentId);
         }
 
-        // 4. 박스 재고 차감 — final_box 우선, 없으면 recommended_box. 동시성 보호를 위해 비관적
+        // 5. 박스 재고 차감 — final_box 우선, 없으면 recommended_box. 동시성 보호를 위해 비관적
         // 락 조회(findByIdForUpdate)로 가져온다(ProductRepository.findByGtinForUpdate와 같은 이유:
         // 여러 포장완료 요청이 같은 박스 재고를 동시에 깎을 때 lost update 방지).
         Long boxId = shipment.finalBoxId() != null ? shipment.finalBoxId() : shipment.recommendedBoxId();
@@ -97,7 +111,7 @@ public class ShipmentCompleteService {
         }
         boxType.decreaseStock();
 
-        // 5. 토트 할당 해제 — PACKING 상태는 항상 활성 tote_assignment가 있어야 정상이므로,
+        // 6. 토트 할당 해제 — PACKING 상태는 항상 활성 tote_assignment가 있어야 정상이므로,
         // 없으면 데이터 정합성이 깨진 것 (ShipmentDetailService의 기존 방어 패턴과 동일).
         ToteAssignment assignment = toteAssignmentRepository.findByShipmentIdAndReleasedAtIsNull(shipmentId)
                 .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR,
@@ -108,7 +122,7 @@ public class ShipmentCompleteService {
                         "tote_assignment가 참조하는 토트를 찾을 수 없습니다: toteId=" + assignment.toteId()));
         tote.release();
 
-        // 6. shipment 상태 전이 — 엔티티 자체 불변식(Shipment.complete())으로 한 번 더 방어한다.
+        // 7. shipment 상태 전이 — 엔티티 자체 불변식(Shipment.complete())으로 한 번 더 방어한다.
         // IllegalStateException은 2번에서 이미 걸러졌다면 여기서 발생할 수 없지만, 엔티티가 다른
         // 경로로 호출돼도 안전하도록 방어 코드는 유지하고 ApiException(INVALID_STATE)로 변환한다.
         try {
@@ -117,14 +131,15 @@ public class ShipmentCompleteService {
             throw new ApiException(ErrorCode.INVALID_STATE, e.getMessage());
         }
 
-        // 7. line.packedCount — 방금 반영된 shipment 상태 변경까지 포함해 그 즉시 값으로 센다.
+        // 8. line.packedCount — 방금 반영된 shipment 상태 변경까지 포함해 그 즉시 값으로 센다.
         long packedCount = shipmentRepository.countByLineIdAndStatus(shipment.lineId(), Shipment.Status.PACKED);
 
-        // 8. 응답 조립.
+        // 9. 응답 조립.
         return new ShipmentCompleteResponse(
                 shipment.id(),
                 shipment.status().name(),
                 shipment.packedAt(),
+                expectedWeightKg,
                 new ShipmentCompleteResponse.Line(shipment.lineId(), packedCount));
     }
 }

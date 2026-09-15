@@ -1,6 +1,7 @@
 package com.awesome.backend.orders.service;
 
 import com.awesome.backend.orders.packing.BlockFactory;
+import com.awesome.backend.orders.packing.CarrierLimits;
 import com.awesome.backend.orders.packing.Cartonizer;
 import com.awesome.backend.orders.packing.PackingEngine;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -26,7 +27,19 @@ public class PackingConfig {
     }
 
     @Bean
-    public Cartonizer cartonizer(PackingEngine packingEngine) {
-        return new Cartonizer(packingEngine);
+    public CarrierLimits carrierLimits(PackingProperties properties) {
+        PackingProperties.Carrier carrier = properties.carrier();
+        return new CarrierLimits(carrier.maxSumCm(), carrier.maxLongestCm(), carrier.maxWeightKg());
+    }
+
+    /** 출고 무게 검수(outbound)가 쓰는 허용 오차. packing.* 설정에 묶여 있어 여기서 노출한다. */
+    @Bean
+    public PackingProperties.WeightCheck weightCheck(PackingProperties properties) {
+        return properties.weightCheck();
+    }
+
+    @Bean
+    public Cartonizer cartonizer(PackingEngine packingEngine, CarrierLimits carrierLimits) {
+        return new Cartonizer(packingEngine, carrierLimits);
     }
 }

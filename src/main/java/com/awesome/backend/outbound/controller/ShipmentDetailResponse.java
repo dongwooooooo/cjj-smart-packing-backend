@@ -1,5 +1,6 @@
 package com.awesome.backend.outbound.controller;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -9,6 +10,9 @@ import java.util.List;
  * 셋 다 이 응답 하나를 구성하는 조각일 뿐 다른 API에서 재사용되지 않아, 별도 파일로 쪼갤 만큼
  * 독립적이지 않다. {@code recommendedBox}/{@code finalBox}는 GET /box-types 응답과 필드 모양이
  * 정확히 같아 새 DTO를 만들지 않고 {@link BoxTypeResponse}를 그대로 재사용한다.
+ *
+ * <p>{@code expectedWeightKg}는 상품 무게와 박스 자체 무게로 구한 예상 총무게 — 포장 화면이
+ * 저울 값과 대조해 보여준다. 상품 무게가 하나라도 비어 있으면 null이다.
  *
  * <p>{@code tote}/{@code finalBox}는 nullable — 활성 tote_assignment가 없으면 {@code tote}가,
  * {@code Shipment.finalBoxId}가 없으면 {@code finalBox}가 필드째로 {@code null}이 된다(둘 다
@@ -24,6 +28,7 @@ public record ShipmentDetailResponse(
         BoxTypeResponse recommendedBox,
         BoxTypeResponse finalBox,
         boolean fillerRecommended,
+        BigDecimal expectedWeightKg,
         List<ItemResponse> items) {
 
     public record LineResponse(Long lineId, String name) {

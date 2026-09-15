@@ -61,6 +61,7 @@ public class ShipmentDetailService {
     private final ShipmentItemRepository shipmentItemRepository;
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ShipmentWeightEstimator weightEstimator;
 
     public ShipmentDetailService(
             ShipmentRepository shipmentRepository,
@@ -70,7 +71,8 @@ public class ShipmentDetailService {
             BoxTypeRepository boxTypeRepository,
             ShipmentItemRepository shipmentItemRepository,
             ProductRepository productRepository,
-            CategoryRepository categoryRepository) {
+            CategoryRepository categoryRepository,
+            ShipmentWeightEstimator weightEstimator) {
         this.shipmentRepository = shipmentRepository;
         this.lineRepository = lineRepository;
         this.toteAssignmentRepository = toteAssignmentRepository;
@@ -79,6 +81,7 @@ public class ShipmentDetailService {
         this.shipmentItemRepository = shipmentItemRepository;
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.weightEstimator = weightEstimator;
     }
 
     public ShipmentDetailResponse find(Long shipmentId) {
@@ -107,6 +110,7 @@ public class ShipmentDetailService {
                 recommendedBox,
                 finalBox,
                 shipment.fillerRecommended(),
+                weightEstimator.expectedKg(shipment).orElse(null),
                 items);
     }
 

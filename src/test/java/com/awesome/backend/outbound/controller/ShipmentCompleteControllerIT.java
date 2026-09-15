@@ -21,6 +21,7 @@ import com.awesome.backend.outbound.repository.ShipmentRepository;
 import com.awesome.backend.outbound.repository.ToteAssignmentRepository;
 import com.awesome.backend.outbound.repository.ToteRepository;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -51,6 +52,7 @@ import tools.jackson.databind.ObjectMapper;
  * 않게 한다: JUICE(정상 완료 — final_box 우선 확인), CHIP+GRAPE(상품 재고 부족 — 부분 롤백
  * 확인), PIE(박스 재고 부족 — recommended_box 경로 확인). box_type도 마찬가지로 A/B호는 정상
  * 완료 시나리오(추천 vs 확정) 확인용, C호는 재고를 0으로 강제해 박스 품절 시나리오 전담으로 쓴다.
+ * 무게 검수 시나리오는 RAMEN + D호를 전담으로 쓴다.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
@@ -64,11 +66,16 @@ class ShipmentCompleteControllerIT {
     private static final String GRAPE = "8801234500028";
     private static final String CHIP = "8801234500042";
     private static final String PIE = "8801234500059";
+    private static final String RAMEN = "8801234500066";
+
+    /** RAMEN 1개 무게 (V2 seed product.weight_kg). */
+    private static final BigDecimal RAMEN_WEIGHT_KG = new BigDecimal("0.600");
 
     // V2 seed box_type: A호=1, B호=2, C호=3 (전부 stock_qty=100으로 시작)
     private static final long BOX_A = 1L;
     private static final long BOX_B = 2L;
     private static final long BOX_C = 3L;
+    private static final long BOX_D = 4L;
 
     @LocalServerPort int port;
 
@@ -218,6 +225,58 @@ class ShipmentCompleteControllerIT {
         assertThat(boxTypeRepository.findById(BOX_C).orElseThrow().stockQty()).isEqualTo(0);
     }
 
+    @Test
+    void 잰_무게가_예상_범위_안이면_포장을_완료한다() throws IOException, InterruptedException {
+        // 라면 3개 = 1.800kg (박스 자체 무게 0.000kg). 허용 오차는
+        // max(0.1, 1.800×0.03=0.054) = 0.1kg이라 1.850kg은 통과한다.
+        Line line = lineRepository.findAll().get(0);
+        setStock(RAMEN, 20);
+        long ramenProductId = productRepository.findByGtin(RAMEN).orElseThrow().id();
+        Shipment shipment = savePackingShipment(line, BOX_D, null);
+        shipmentItemRepository.save(new ShipmentItem(shipment.id(), ramenProductId, 3));
+        assignIdleTote(shipment.id());
+
+        HttpResponse<String> response = post(
+                "/api/v1/shipments/" + shipment.id() + "/complete",
+                "{\"measuredWeightKg\": 1.850}");
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        ShipmentCompleteResponse body =
+                objectMapper.readValue(response.body(), ShipmentCompleteResponse.class);
+        assertThat(body.status()).isEqualTo("PACKED");
+        assertThat(body.expectedWeightKg())
+                .isEqualByComparingTo(RAMEN_WEIGHT_KG.multiply(BigDecimal.valueOf(3)));
+        assertThat(productRepository.findByGtin(RAMEN).orElseThrow().stockQty()).isEqualTo(17);
+    }
+
+    @Test
+    void 잰_무게가_허용_오차_밖이면_포장완료를_막고_되돌린다()
+            throws IOException, InterruptedException {
+        // 예상 1.800kg인데 2.500kg — 0.7kg 차이라 허용 오차 0.1kg을 넘는다.
+        Line line = lineRepository.findAll().get(0);
+        setStock(RAMEN, 20);
+        long ramenProductId = productRepository.findByGtin(RAMEN).orElseThrow().id();
+        Shipment shipment = savePackingShipment(line, BOX_D, null);
+        shipmentItemRepository.save(new ShipmentItem(shipment.id(), ramenProductId, 3));
+        assignIdleTote(shipment.id());
+        int boxStockBefore = boxTypeRepository.findById(BOX_D).orElseThrow().stockQty();
+
+        HttpResponse<String> response = post(
+                "/api/v1/shipments/" + shipment.id() + "/complete",
+                "{\"measuredWeightKg\": 2.500}");
+
+        assertThat(response.statusCode()).isEqualTo(409);
+        assertThat(response.body()).contains("WEIGHT_MISMATCH");
+        assertThat(response.body()).contains("expectedKg").contains("measuredKg").contains("toleranceKg");
+
+        // 재고·상태는 손대기 전에 막혔다
+        assertThat(shipmentRepository.findById(shipment.id()).orElseThrow().status())
+                .isEqualTo(Shipment.Status.PACKING);
+        assertThat(productRepository.findByGtin(RAMEN).orElseThrow().stockQty()).isEqualTo(20);
+        assertThat(inventoryTxRepository.findByProductIdOrderByIdAsc(ramenProductId)).isEmpty();
+        assertThat(boxTypeRepository.findById(BOX_D).orElseThrow().stockQty()).isEqualTo(boxStockBefore);
+    }
+
     private void setStock(String gtin, int qty) {
         Product product = productRepository.findByGtin(gtin).orElseThrow();
         product.changeStockQty(qty);
@@ -256,6 +315,16 @@ class ShipmentCompleteControllerIT {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + port + path))
                 .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> post(String path, String body)
+            throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + path))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
