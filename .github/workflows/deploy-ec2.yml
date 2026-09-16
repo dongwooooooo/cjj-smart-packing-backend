@@ -18,14 +18,14 @@ on:
   workflow_run:
     workflows: [build-push]
     types: [completed]
-    branches: [develop]
+    branches: [main]
   workflow_dispatch:
     inputs:
       ref:
-        description: '배포할 git ref (compose 파일 기준). 비우면 develop.'
+        description: '배포할 git ref (compose 파일 기준). 비우면 main.'
         required: false
         type: string
-        default: 'develop'
+        default: 'main'
       image_tag:
         description: '배포할 이미지 태그. 비우면 latest. 롤백은 여기에 이전 태그를 넣는다.'
         required: false
