@@ -251,6 +251,17 @@ jobs:
             sleep 5
           done
           echo "헬스체크 통과: $(curl -fsS --max-time 5 "$HEALTH_URL")"
+
+          # 배포 시각을 Grafana 주석으로 남긴다. 부하 테스트 그래프에서 배포와 겹친 구간을 구분하기 위해서다.
+          # 모니터링 스택이 없는 인스턴스면 조용히 건너뛴다.
+          MON_ENV=/home/ubuntu/monitoring/.env
+          if [ -f "$MON_ENV" ]; then
+            GF_PW=$(grep '^GRAFANA_ADMIN_PASSWORD=' "$MON_ENV" | cut -d= -f2-)
+            NOW_MS=$(($(date +%s) * 1000))
+            curl -fsS --max-time 5 -u "admin:${GF_PW}" -H 'Content-Type: application/json' \
+              -d "{\"tags\":[\"deploy\",\"backend\"],\"text\":\"deploy ${IMAGE_TAG}\",\"time\":${NOW_MS}}" \
+              http://127.0.0.1:3000/api/annotations >/dev/null 2>&1 && echo "Grafana 배포 주석 기록" || echo "Grafana 주석 생략"
+          fi
           INSTANCE_SCRIPT
           bash -n deploy-on-instance.sh
           echo "인스턴스 스크립트 문법 검사 통과 ($(wc -c < deploy-on-instance.sh) 바이트)"
