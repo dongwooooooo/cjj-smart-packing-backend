@@ -12,6 +12,8 @@ import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.CategoryAttributeMapRepository;
 import com.awesome.backend.inbound.repository.MeasurementSessionRepository;
 import com.awesome.backend.inbound.repository.ProductRepository;
+import com.awesome.backend.common.metrics.StageTimers;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -40,12 +42,15 @@ public class MeasurementService {
     private final MeasurementGate gate;
     private final MeasurementWriter writer;
 
+    private final MeterRegistry registry;
+
     public MeasurementService(ProductRepository productRepository,
                               MeasurementSessionRepository sessionRepository,
                               MeasurementImageSource imageSource,
                               InferenceClient inferenceClient,
-                              MeasurementGate gate, MeasurementWriter writer) {
+                              MeasurementGate gate, MeasurementWriter writer, MeterRegistry registry) {
         this.productRepository = productRepository;
+        this.registry = registry;
         this.sessionRepository = sessionRepository;
         this.imageSource = imageSource;
         this.inferenceClient = inferenceClient;
@@ -83,6 +88,11 @@ public class MeasurementService {
         log.info("measure.timing productId={} images={} status={} loadMs={} inferMs={} saveMs={} totalMs={}",
                 productId, images.size(), response.status(), (t1 - t0) / 1_000_000,
                 (t2 - t1) / 1_000_000, (t3 - t2) / 1_000_000, (t3 - t0) / 1_000_000);
+        String outcome = response.status();
+        StageTimers.record(registry, "measure.stage", "load", outcome, t1 - t0);
+        StageTimers.record(registry, "measure.stage", "infer", outcome, t2 - t1);
+        StageTimers.record(registry, "measure.stage", "save", outcome, t3 - t2);
+        StageTimers.record(registry, "measure.stage", "total", outcome, t3 - t0);
         return response;
     }
 

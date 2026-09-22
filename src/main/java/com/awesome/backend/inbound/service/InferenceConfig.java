@@ -28,7 +28,7 @@ public class InferenceConfig {
 
     @Bean
     public InferenceClient inferenceClient(InferenceProperties properties,
-                                           DemoProductRepository demoProducts) {
+                                           DemoProductRepository demoProducts, io.micrometer.core.instrument.MeterRegistry registry) {
         if (properties.useMock()) {
             log.info("INFERENCE_LAMBDA_FUNCTION 미설정 — mock 추론으로 기동한다 (D-04).");
             return new MockInferenceClient(properties.mock(), demoProducts);
@@ -63,6 +63,6 @@ public class InferenceConfig {
         // Boot 4 는 Jackson 3 를 자동 구성하고 Jackson 2 ObjectMapper 빈은 없다 — 데모 로더와 같은 방식으로
         // 직접 만든다. 이벤트 JSON 은 HTTP 응답과 무관하니 앱 설정을 공유할 이유도 없다.
         return new LambdaInferenceClient(lambda, properties.lambdaFunction(), properties.apiKey(),
-                new ObjectMapper());
+                new ObjectMapper(), registry);
     }
 }

@@ -2,6 +2,8 @@ package com.awesome.backend.inbound.service;
 
 import com.awesome.backend.common.storage.ImageUploadExecutorConfig;
 import com.awesome.backend.common.storage.StorageProperties;
+import com.awesome.backend.common.metrics.StageTimers;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -28,10 +30,13 @@ public class MeasurementImageUploader {
     private final MeasurementImageUploadState uploadState;
     private final StorageProperties.Upload upload;
 
+    private final MeterRegistry registry;
+
     public MeasurementImageUploader(MeasurementImageSource imageSource,
                                     MeasurementImageUploadState uploadState,
-                                    StorageProperties properties) {
+                                    StorageProperties properties, MeterRegistry registry) {
         this.imageSource = imageSource;
+        this.registry = registry;
         this.uploadState = uploadState;
         this.upload = properties.upload();
     }
@@ -53,6 +58,8 @@ public class MeasurementImageUploader {
         long uploadMs = (System.nanoTime() - t0) / 1_000_000;
         log.info("upload.timing sessionId={} images={} failed={} uploadMs={}",
                 event.sessionId(), event.images().size(), failed, uploadMs);
+        StageTimers.record(registry, "upload.duration", "s3", failed == 0 ? "ok" : "failed",
+                System.nanoTime() - t0);
     }
 
     /** 한 장. 올렸으면 true, 재시도까지 실패했으면 false. */

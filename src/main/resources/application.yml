@@ -21,7 +21,25 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # prometheus 는 같은 8000 포트로 노출한다. ApiKeyFilter 가 health 만 열어 두므로
+        # /actuator/prometheus 는 X-Demo-Key 가 있어야 읽힌다 — Prometheus 스크레이프 설정에 헤더를 넣는다.
+        include: health,prometheus
+  metrics:
+    distribution:
+      # p50/p95/p99 를 Prometheus 쪽에서 histogram_quantile 로 계산할 수 있게 버킷을 내보낸다.
+      percentiles-histogram:
+        http.server.requests: true
+        measure.stage: true
+        inference.stage: true
+        upload.duration: true
+      slo:
+        http.server.requests: 100ms,250ms,500ms,1s,2s,5s
+        measure.stage: 100ms,250ms,500ms,1s,2s,5s
+  observations:
+    http:
+      server:
+        requests:
+          name: http.server.requests
 
 packing:
   # 명세 §4-6. margin-cm은 D-11 확정값, filler-thickness-cm은 리허설 때 조정할 임의값

@@ -45,7 +45,7 @@ class LambdaInferenceLiveTest {
                 .build();
         LambdaInferenceClient client = new LambdaInferenceClient(lambda,
                 System.getenv("INFERENCE_LAMBDA_FUNCTION"), System.getenv("INFERENCE_API_KEY"),
-                new ObjectMapper());
+                new ObjectMapper(), new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
 
         List<CameraImage> images = List.of(
                 new CameraImage((short) 1, syntheticJpeg(Color.ORANGE), "cam1"),

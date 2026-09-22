@@ -30,7 +30,7 @@ class LambdaInferenceClientTest {
 
     private final LambdaClient lambda = mock(LambdaClient.class);
     private final LambdaInferenceClient client =
-            new LambdaInferenceClient(lambda, "logistics-dimension-api:live", "secret", JSON);
+            new LambdaInferenceClient(lambda, "logistics-dimension-api:live", "secret", JSON, new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
 
     private static Product product() {
         return mock(Product.class);

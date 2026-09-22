@@ -11,6 +11,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import com.awesome.backend.common.metrics.StageTimers;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -51,9 +54,12 @@ public class LambdaInferenceClient implements InferenceClient {
     private final String apiKey;
     private final ObjectMapper objectMapper;
 
+    private final MeterRegistry registry;
+
     public LambdaInferenceClient(LambdaClient lambda, String functionName, String apiKey,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper, MeterRegistry registry) {
         this.lambda = lambda;
+        this.registry = registry;
         this.functionName = functionName;
         this.apiKey = apiKey;
         this.objectMapper = objectMapper;
@@ -79,6 +85,7 @@ public class LambdaInferenceClient implements InferenceClient {
             int jpegBytes = images.stream().mapToInt(i -> i.jpeg().length).sum();
 
             if (response.functionError() != null) {
+                StageTimers.record(registry, "inference.stage", "invoke", "function_error", t2 - t1);
                 log.warn("Lambda 함수 오류. productId={} error={} payload={}", product.id(),
                         response.functionError(), preview(response.payload()));
                 return InferenceResult.failed("LAMBDA_ERROR");
@@ -90,9 +97,13 @@ public class LambdaInferenceClient implements InferenceClient {
             log.info("inference.timing productId={} jpegBytes={} eventBytes={} buildMs={} invokeMs={} parseMs={}",
                     product.id(), jpegBytes, event.length, (t1 - t0) / 1_000_000, (t2 - t1) / 1_000_000,
                     (t3 - t2) / 1_000_000);
+            StageTimers.record(registry, "inference.stage", "build", "ok", t1 - t0);
+            StageTimers.record(registry, "inference.stage", "invoke", "ok", t2 - t1);
+            StageTimers.record(registry, "inference.stage", "parse", "ok", t3 - t2);
             return parsed;
 
         } catch (ApiCallTimeoutException | ApiCallAttemptTimeoutException e) {
+            Counter.builder("inference.failures").tag("reason", "timeout").register(registry).increment();
             // 콜드스타트(약 10초)가 8초 계약을 넘기면 여기로 온다. 시연 시간대에는 provisioned
             // concurrency 로 막는다 (D-24).
             log.warn("추론 타임아웃. productId={}", product.id(), e);
