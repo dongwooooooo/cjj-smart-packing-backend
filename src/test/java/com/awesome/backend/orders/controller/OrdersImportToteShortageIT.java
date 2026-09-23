@@ -4,6 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.awesome.backend.inbound.entity.Product;
+import com.awesome.backend.inbound.repository.ProductRepository;
+import com.awesome.backend.inventory.service.AvailableStockQuery;
+import com.awesome.backend.inventory.service.StockMovementRecorder;
 import com.awesome.backend.orders.repository.OrderRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +45,9 @@ class OrdersImportToteShortageIT {
 
     @Autowired WebApplicationContext context;
     @Autowired OrderRepository orderRepository;
+    @Autowired ProductRepository productRepository;
+    @Autowired StockMovementRecorder stockMovementRecorder;
+    @Autowired AvailableStockQuery stockQuery;
     @Autowired JdbcTemplate jdbcTemplate;
 
     private MockMvc mvc;
@@ -50,9 +57,10 @@ class OrdersImportToteShortageIT {
         mvc = MockMvcBuilders.webAppContextSetup(context).build();
         jdbcTemplate.update("""
                 update product set width_cm = 5.0, length_cm = 5.0, height_cm = 2.0,
-                                   dim_status = 'CONFIRMED', stock_qty = 10
+                                   dim_status = 'CONFIRMED'
                 where gtin = ?
                 """, CHIP);
+        setOnHandQty(CHIP, 10);
     }
 
     @AfterEach
@@ -66,8 +74,19 @@ class OrdersImportToteShortageIT {
         jdbcTemplate.update("update tote set status = 'IDLE'");
         jdbcTemplate.update("""
                 update product set width_cm = null, length_cm = null, height_cm = null,
-                                   dim_status = 'NONE', stock_qty = 0
+                                   dim_status = 'NONE'
                 """);
+        for (Product product : productRepository.findAll()) {
+            setOnHandQty(product.gtin(), 0);
+        }
+    }
+
+    /** 원장(재고 창구)을 경유해 실재고를 목표값으로 맞춘다 — 읽기 경로가 원장을 보므로 직접 SQL 로는 안 된다. */
+    private void setOnHandQty(String gtin, int target) {
+        int delta = target - stockQuery.onHandQty(gtin);
+        if (delta != 0) {
+            stockMovementRecorder.adjust(gtin, delta);
+        }
     }
 
     @Test
