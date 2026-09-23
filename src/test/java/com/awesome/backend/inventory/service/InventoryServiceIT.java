@@ -42,6 +42,23 @@ class InventoryServiceIT {
     @Autowired OrderRepository orderRepository;
     @Autowired ShipmentRepository shipmentRepository;
     @Autowired ShipmentItemRepository shipmentItemRepository;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    @Test
+    void 실재고와_가용재고는_스냅샷에_미집계_원장을_더해_계산한다() {
+        Long productId = productRepository.findByGtin(JUICE).orElseThrow().id();
+        // 스냅샷을 100 으로 고정하고, 그 뒤 원장에 +5, -3 을 넣는다.
+        jdbcTemplate.update("update stock_balance set qty = 100, last_tx_id = "
+                + "(select coalesce(max(id),0) from inventory_tx where product_id = ?) where product_id = ?",
+                productId, productId);
+        inventoryTxRepository.save(new InventoryTx(productId, InventoryTx.TxType.INBOUND, 5, "STOCK_IN", null));
+        inventoryTxRepository.save(new InventoryTx(productId, InventoryTx.TxType.OUTBOUND_PACKED, -3, "SHIPMENT", 1L));
+        inventoryTxRepository.flush();
+        plannedShipment(productId, 10);
+
+        assertThat(inventoryService.onHandQty(JUICE)).isEqualTo(102);
+        assertThat(inventoryService.availableQty(JUICE)).isEqualTo(92);
+    }
 
     @Test
     void 수량_입고는_장부_기록과_캐시_증가를_함께_한다() {

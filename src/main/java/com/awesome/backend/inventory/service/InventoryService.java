@@ -6,6 +6,7 @@ import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.inventory.entity.InventoryTx;
 import com.awesome.backend.inventory.repository.InventoryTxRepository;
+import com.awesome.backend.inventory.repository.StockBalanceRepository;
 import com.awesome.backend.outbound.repository.ShipmentItemRepository;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -21,26 +22,29 @@ public class InventoryService implements AvailableStockQuery, StockMovementRecor
     private final ProductRepository productRepository;
     private final InventoryTxRepository inventoryTxRepository;
     private final ShipmentItemRepository shipmentItemRepository;
+    private final StockBalanceRepository stockBalanceRepository;
 
     public InventoryService(ProductRepository productRepository,
                             InventoryTxRepository inventoryTxRepository,
-                            ShipmentItemRepository shipmentItemRepository) {
+                            ShipmentItemRepository shipmentItemRepository,
+                            StockBalanceRepository stockBalanceRepository) {
         this.productRepository = productRepository;
         this.inventoryTxRepository = inventoryTxRepository;
         this.shipmentItemRepository = shipmentItemRepository;
+        this.stockBalanceRepository = stockBalanceRepository;
     }
 
     @Override
     @Transactional(readOnly = true)
     public int onHandQty(String gtin) {
-        return product(gtin).stockQty();
+        return stockBalanceRepository.onHandQty(product(gtin).id());
     }
 
     @Override
     @Transactional(readOnly = true)
     public int availableQty(String gtin) {
-        Product product = product(gtin);
-        return product.stockQty() - shipmentItemRepository.allocatedQty(product.id());
+        Long productId = product(gtin).id();
+        return stockBalanceRepository.onHandQty(productId) - shipmentItemRepository.allocatedQty(productId);
     }
 
     @Override
