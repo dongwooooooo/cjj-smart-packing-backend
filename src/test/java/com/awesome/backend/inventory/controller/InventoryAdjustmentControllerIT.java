@@ -133,6 +133,24 @@ class InventoryAdjustmentControllerIT {
         assertThat(bad.statusCode()).isEqualTo(400);
     }
 
+    @Test
+    void delta_없으면_400() throws IOException, InterruptedException {
+        String key = "adj-missing-delta-" + System.nanoTime();
+        HttpResponse<String> bad = post("""
+                {"gtin":"%s","idempotencyKey":"%s","reason":"x"}""".formatted(CIDER, key));
+        assertThat(bad.statusCode()).isEqualTo(400);
+        assertThat(inventoryTxRepository.findByIdempotencyKey(key)).isEmpty();
+    }
+
+    @Test
+    void delta가_0이면_400() throws IOException, InterruptedException {
+        String key = "adj-zero-delta-" + System.nanoTime();
+        HttpResponse<String> bad = post("""
+                {"gtin":"%s","delta":0,"idempotencyKey":"%s","reason":"x"}""".formatted(CIDER, key));
+        assertThat(bad.statusCode()).isEqualTo(400);
+        assertThat(inventoryTxRepository.findByIdempotencyKey(key)).isEmpty();
+    }
+
     private HttpResponse<String> post(String body) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:" + port + PATH))

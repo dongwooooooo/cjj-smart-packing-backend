@@ -26,16 +26,18 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * 부하 테스트 실행 4(2026-09-22)의 데드락 재현. 품목 순서가 [JUICE, GRAPE]인 배송단위와
- * [GRAPE, JUICE]인 배송단위를 두 스레드가 동시에 완료한다. 상품 행을 shipment_item 순서로
- * 잠그는 현재 코드에서는 한쪽이 deadlock detected 로 끝난다. 클래스 레벨 @Transactional 없음 —
- * 스레드마다 실제 트랜잭션이 필요하다.
+ * 부하 테스트 실행 4(2026-09-22)의 데드락 회귀 테스트. 품목 순서가 [JUICE, GRAPE]인 배송단위와
+ * [GRAPE, JUICE]인 배송단위를 두 스레드가 동시에 완료한다. 상품 행을 shipment_item 순서로 잠그던
+ * 이전 코드에서는 한쪽이 deadlock detected 로 끝났다. 원장 기반 재고에서는 포장 완료가 원장 행만
+ * 추가하고 박스 행 하나만 잠가 둘 다 성공해야 한다. 클래스 레벨 @Transactional 없음 — 스레드마다
+ * 실제 트랜잭션이 필요하다.
  */
 @SpringBootTest
 @Testcontainers
@@ -59,6 +61,7 @@ class ShipmentCompleteDeadlockIT {
     @Autowired ShipmentItemRepository shipmentItemRepository;
     @Autowired ToteRepository toteRepository;
     @Autowired ToteAssignmentRepository toteAssignmentRepository;
+    @Autowired JdbcTemplate jdbcTemplate;
 
     @Test
     void 반대_순서_품목을_동시에_완료해도_둘_다_성공한다() throws Exception {
@@ -67,26 +70,46 @@ class ShipmentCompleteDeadlockIT {
         long juice = productRepository.findByGtin(JUICE).orElseThrow().id();
         long grape = productRepository.findByGtin(GRAPE).orElseThrow().id();
 
+        long packedRowsBefore = packedRows(juice, grape);
+
         ExecutorService pool = Executors.newFixedThreadPool(2);
         int failures = 0;
         List<String> errors = new ArrayList<>();
-        for (int round = 0; round < ROUNDS; round++) {
-            long a = packingShipment(List.of(juice, grape));
-            long b = packingShipment(List.of(grape, juice));
-            CountDownLatch start = new CountDownLatch(1);
-            Future<Throwable> fa = pool.submit(() -> run(start, a));
-            Future<Throwable> fb = pool.submit(() -> run(start, b));
-            start.countDown();
-            for (Future<Throwable> f : List.of(fa, fb)) {
-                Throwable t = f.get(60, TimeUnit.SECONDS);
-                if (t != null) {
-                    failures++;
-                    errors.add(t.getClass().getSimpleName() + ": " + firstLine(t.getMessage()));
+        List<Long> lastRound = List.of();
+        try {
+            for (int round = 0; round < ROUNDS; round++) {
+                long a = packingShipment(List.of(juice, grape));
+                long b = packingShipment(List.of(grape, juice));
+                lastRound = List.of(a, b);
+                CountDownLatch start = new CountDownLatch(1);
+                Future<Throwable> fa = pool.submit(() -> run(start, a));
+                Future<Throwable> fb = pool.submit(() -> run(start, b));
+                start.countDown();
+                for (Future<Throwable> f : List.of(fa, fb)) {
+                    Throwable t = f.get(60, TimeUnit.SECONDS);
+                    if (t != null) {
+                        failures++;
+                        errors.add(t.getClass().getSimpleName() + ": " + firstLine(t.getMessage()));
+                    }
                 }
             }
+        } finally {
+            pool.shutdownNow();
         }
-        pool.shutdown();
         assertThat(failures).as("실패 목록: %s", errors).isZero();
+        for (long shipmentId : lastRound) {
+            assertThat(shipmentRepository.findById(shipmentId).orElseThrow().status())
+                    .isEqualTo(Shipment.Status.PACKED);
+        }
+        // 라운드마다 배송단위 2개 × 품목 2개 = 포장 원장 4행
+        assertThat(packedRows(juice, grape) - packedRowsBefore).isEqualTo(2L * ROUNDS * 2);
+    }
+
+    private long packedRows(long juice, long grape) {
+        return jdbcTemplate.queryForObject("""
+                select count(*) from inventory_tx
+                 where tx_type = 'OUTBOUND_PACKED' and product_id in (?, ?)
+                """, Long.class, juice, grape);
     }
 
     private Throwable run(CountDownLatch start, long shipmentId) {

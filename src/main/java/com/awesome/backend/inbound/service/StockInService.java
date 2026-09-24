@@ -13,8 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 수량 입고 (02 §1-5). 재고 증가의 유일한 경로다 (D-09).
  *
- * <p>stock_qty 를 직접 고치지 않고 inventory 의 {@link StockMovementRecorder} 창구를 쓴다 —
- * 재고는 원장 창구로만 바뀐다 (docs/05 §3).
+ * <p>inventory 의 {@link StockMovementRecorder} 창구로 입고 원장 행만 추가한다 — 재고는 원장 창구로만
+ * 바뀌고 잔고는 원장에서 유도한다 (specs/2026-09-23-ledger-stock-design.md 3절).
  */
 @Service
 public class StockInService {

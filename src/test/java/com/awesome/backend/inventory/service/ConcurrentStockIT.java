@@ -15,7 +15,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * 동시 재고 증감의 lost update 회귀 테스트.
+ * 원장 동시 추가 회귀 테스트 — 여러 스레드가 동시에 입고 원장 행을 추가해도 한 건도 유실되지 않아야 한다.
  * 클래스 레벨 @Transactional 없음 — 스레드마다 실제 커밋이 일어나야 검증이 된다.
  */
 @SpringBootTest

@@ -1,8 +1,8 @@
 package com.awesome.backend.inventory.service;
 
 /**
- * 재고 이동 기록의 단일 창구. 장부(inventory_tx) 기록과 캐시(stock_qty) 갱신을
- * 항상 한 트랜잭션으로 묶는다 — 호출자가 따로 챙길 수 없게 하기 위한 분리.
+ * 재고 이동 기록의 단일 창구. 모든 이동은 원장(inventory_tx)에 행을 추가하는 것뿐이다 — 잔고
+ * 스냅샷(stock_balance)은 StockBalanceCollector 가 원장에서 유도한다 (specs/2026-09-23-ledger-stock-design.md 3절).
  */
 public interface StockMovementRecorder {
 
