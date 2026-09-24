@@ -86,4 +86,8 @@ public class InventoryTx {
     public String idempotencyKey() {
         return idempotencyKey;
     }
+
+    public String reason() {
+        return reason;
+    }
 }

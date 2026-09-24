@@ -11,6 +11,14 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -70,6 +78,52 @@ class InventoryAdjustmentControllerIT {
                 {"gtin":"%s","delta":2,"idempotencyKey":"%s","reason":"b"}""".formatted(CIDER, key));
         assertThat(conflict.statusCode()).isEqualTo(409);
         assertThat(conflict.body()).contains("IDEMPOTENCY_CONFLICT");
+    }
+
+    @Test
+    void 같은_키_동시_요청은_한_건만_기록되고_전부_200이다() throws InterruptedException {
+        stock.set(CIDER, 10);
+        String key = "adj-" + System.nanoTime();
+        String body = """
+                {"gtin":"%s","delta":3,"idempotencyKey":"%s","reason":"동시성 테스트"}""".formatted(CIDER, key);
+        int threads = 8;
+
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Callable<HttpResponse<String>>> tasks = java.util.stream.IntStream.range(0, threads)
+                .<Callable<HttpResponse<String>>>mapToObj(i -> () -> {
+                    start.await();
+                    return post(body);
+                })
+                .toList();
+
+        List<Future<HttpResponse<String>>> futures = tasks.stream().map(pool::submit).toList();
+        start.countDown();
+        List<HttpResponse<String>> responses = futures.stream().map(f -> {
+            try {
+                return f.get();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }).toList();
+        pool.shutdown();
+        assertThat(pool.awaitTermination(30, TimeUnit.SECONDS)).isTrue();
+
+        assertThat(responses).allSatisfy(r -> assertThat(r.statusCode()).isEqualTo(200));
+        List<InventoryAdjustmentResponse> parsed = responses.stream()
+                .map(r -> {
+                    try {
+                        return objectMapper.readValue(r.body(), InventoryAdjustmentResponse.class);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .collect(Collectors.toList());
+
+        assertThat(parsed.stream().map(InventoryAdjustmentResponse::txId).distinct()).hasSize(1);
+        assertThat(parsed.stream().filter(r -> !r.duplicated())).hasSize(1);
+        assertThat(inventoryTxRepository.findByIdempotencyKey(key)).isPresent();
+        assertThat(stock.onHand(CIDER)).isEqualTo(13);
     }
 
     @Test

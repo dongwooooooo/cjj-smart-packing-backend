@@ -10,7 +10,9 @@ import com.awesome.backend.inventory.repository.StockBalanceRepository;
 import com.awesome.backend.outbound.repository.ShipmentItemRepository;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -62,21 +64,49 @@ public class InventoryService implements AvailableStockQuery, StockMovementRecor
                 new InventoryTx(product(gtin).id(), InventoryTx.TxType.OUTBOUND_PACKED, -qty, "SHIPMENT", shipmentId));
     }
 
+    /**
+     * 관리자 보정. 같은 키의 동시 요청은 유니크 인덱스가 하나만 통과시키고, 진 쪽은
+     * 이긴 기록을 다시 읽어 duplicated 로 답한다 — 그래서 트랜잭션 밖에서 실행한다
+     * (클래스 레벨 @Transactional 안에서라면 제약 위반이 트랜잭션 전체를 중단시켜
+     * 재조회가 불가능해진다).
+     */
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AdjustResult adjust(String gtin, int delta, String idempotencyKey, String reason) {
         Long productId = product(gtin).id();
         Optional<InventoryTx> existing = inventoryTxRepository.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
-            InventoryTx tx = existing.get();
-            if (tx.qtyDelta() != delta || !tx.productId().equals(productId)) {
-                throw new ApiException(ErrorCode.IDEMPOTENCY_CONFLICT,
-                        "같은 멱등 키로 다른 조정이 이미 기록돼 있습니다.",
-                        Map.of("idempotencyKey", idempotencyKey, "recordedDelta", tx.qtyDelta()));
-            }
-            return new AdjustResult(tx.id(), tx.qtyDelta(), true);
+            return existingResult(existing.get(), productId, delta);
         }
-        InventoryTx saved = inventoryTxRepository.save(new InventoryTx(productId, delta, idempotencyKey, reason));
+        try {
+            InventoryTx saved = inventoryTxRepository.save(new InventoryTx(productId, delta, idempotencyKey, reason));
+            return new AdjustResult(saved.id(), delta, false);
+        } catch (DataIntegrityViolationException e) {
+            InventoryTx winner = inventoryTxRepository.findByIdempotencyKey(idempotencyKey).orElseThrow(() -> e);
+            return existingResult(winner, productId, delta);
+        }
+    }
+
+    /**
+     * 내부 보정 — 재전송될 일이 없는 호출자용(데모 리셋, 테스트). 멱등 키가 없어 재조회가
+     * 필요 없으므로 adjust() 와 달리 격리된 트랜잭션으로 도피하지 않고 호출자의 트랜잭션에
+     * 그대로 참여한다. 같은 트랜잭션에서 방금 만든 상품 행도 곧바로 봐야 하는 호출(예:
+     * DemoProductProvisioner)에 필요하다.
+     */
+    @Override
+    public AdjustResult adjustInternal(String gtin, int delta, String reason) {
+        Long productId = product(gtin).id();
+        InventoryTx saved = inventoryTxRepository.save(new InventoryTx(productId, delta, null, reason));
         return new AdjustResult(saved.id(), delta, false);
+    }
+
+    private AdjustResult existingResult(InventoryTx tx, Long productId, int delta) {
+        if (tx.qtyDelta() != delta || !tx.productId().equals(productId)) {
+            throw new ApiException(ErrorCode.IDEMPOTENCY_CONFLICT,
+                    "같은 멱등 키로 다른 조정이 이미 기록돼 있습니다.",
+                    Map.of("idempotencyKey", tx.idempotencyKey(), "recordedDelta", tx.qtyDelta()));
+        }
+        return new AdjustResult(tx.id(), tx.qtyDelta(), true);
     }
 
     private Product product(String gtin) {

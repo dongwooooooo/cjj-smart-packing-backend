@@ -106,6 +106,10 @@ class InventoryServiceIT {
 
     @Test
     void 쓰기_경로는_원장만_추가하고_상품_행을_갱신하지_않는다() {
+        // adjustInternal() 사용 — adjust() 는 멱등 재조회를 위해 Propagation.NOT_SUPPORTED 로
+        // 실행되므로, 이 테스트의 클래스 레벨 @Transactional 롤백을 벗어나 실제로 커밋돼
+        // 버린다. adjustInternal() 은 재시도 대상이 아닌 내부 호출자용이라 호출자의 트랜잭션에
+        // 그대로 참여하고, 검증하려는 "쓰기는 원장만 추가한다"는 성질 자체는 두 경로가 같다.
         Long productId = productRepository.findByGtin(JUICE).orElseThrow().id();
         Integer stockQtyBefore = jdbcTemplate.queryForObject(
                 "select stock_qty from product where id = ?", Integer.class, productId);
@@ -113,7 +117,7 @@ class InventoryServiceIT {
 
         inventoryService.recordInbound(JUICE, 10);
         inventoryService.recordOutboundPacked(JUICE, 4, 1L);
-        inventoryService.adjust(JUICE, -1, "internal-" + java.util.UUID.randomUUID(), "test");
+        inventoryService.adjustInternal(JUICE, -1, "test");
         inventoryTxRepository.flush();
 
         Integer stockQtyAfter = jdbcTemplate.queryForObject(

@@ -143,7 +143,7 @@ public class DemoProductProvisioner {
         for (String gtin : gtins) {
             int onHand = stockQuery.onHandQty(gtin);
             if (onHand != 0) {
-                inventoryService.adjust(gtin, -onHand, "internal-" + java.util.UUID.randomUUID(), "demo provision");
+                inventoryService.adjustInternal(gtin, -onHand, "demo provision");
             }
         }
     }
@@ -151,7 +151,7 @@ public class DemoProductProvisioner {
     private void alignStock(DemoProductSpec spec) {
         int delta = spec.stockQty() - stockQuery.onHandQty(spec.gtin());
         if (delta != 0) {
-            inventoryService.adjust(spec.gtin(), delta, "internal-" + java.util.UUID.randomUUID(), "demo provision");
+            inventoryService.adjustInternal(spec.gtin(), delta, "demo provision");
         }
     }
 }
