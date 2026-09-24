@@ -44,6 +44,13 @@ management:
         requests:
           name: http.server.requests
 
+inventory:
+  # 원장 기반 재고 (specs/2026-09-23-ledger-stock-design.md). 두 값 다 초기값, 운영에서 조정.
+  collector:
+    interval-ms: 5000
+  reconciler:
+    interval-ms: 60000
+
 packing:
   # 명세 §4-6. margin-cm은 D-11 확정값, filler-thickness-cm은 리허설 때 조정할 임의값
   margin-cm: 3.0
