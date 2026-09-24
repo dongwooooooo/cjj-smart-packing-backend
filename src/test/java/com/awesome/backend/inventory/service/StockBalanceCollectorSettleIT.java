@@ -30,7 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(properties = {
         "inventory.collector.interval-ms=3600000",
         "inventory.reconciler.interval-ms=3600000",
-        "inventory.collector.settle-seconds=2"})
+        "inventory.collector.settle-seconds=5"})
 @Testcontainers
 class StockBalanceCollectorSettleIT {
 
@@ -39,7 +39,7 @@ class StockBalanceCollectorSettleIT {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18.6");
 
     private static final String PIE = "8801234500059";
-    private static final long SETTLE_WAIT_MS = 2_500;
+    private static final long SETTLE_WAIT_MS = 5_500;
 
     @Autowired StockBalanceCollector collector;
     @Autowired StockBalanceRepository stockBalanceRepository;

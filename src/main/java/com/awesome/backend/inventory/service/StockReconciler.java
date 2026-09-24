@@ -42,7 +42,7 @@ public class StockReconciler {
      * 원장 기준으로 스냅샷을 다시 만든다. 커서는 집계기와 같은 정착 규칙으로 정한다 — 원장 전체의
      * {@code MAX(id)} 로 두면 아직 커밋되지 않은 더 작은 id 행을 영원히 건너뛸 수 있다
      * (StockBalanceCollector 클래스 주석). 정착한 행이 없으면 {@code (0, 0)}.
-     * 파라미터: 정착 창(초), 상품 id, 정착 창(초), 상품 id, 상품 id.
+     * 파라미터: 상품 id, 정착 창(초), 상품 id, 정착 창(초), 상품 id.
      */
     static final String REBUILD = """
             UPDATE stock_balance b
@@ -99,11 +99,16 @@ public class StockReconciler {
         for (Map<String, Object> row : rows) {
             long productId = ((Number) row.get("product_id")).longValue();
             try {
-                transactionTemplate.executeWithoutResult(
+                Integer updated = transactionTemplate.execute(
                         status -> jdbcTemplate.update(REBUILD, productId, settleSeconds, productId, settleSeconds, productId));
-                fixed++;
-                log.warn("stock balance mismatch productId={} derived={} ledgerTotal={} -> rebuilt from ledger",
-                        productId, row.get("derived"), row.get("ledger_total"));
+                if (updated != null && updated > 0) {
+                    fixed++;
+                    log.warn("stock balance mismatch productId={} derived={} ledgerTotal={} -> rebuilt from ledger",
+                            productId, row.get("derived"), row.get("ledger_total"));
+                } else {
+                    // 리셋 직후처럼 스냅샷 행이 아직 없으면 고칠 것이 없다. 다음 집계가 (0,0) 을 만든다.
+                    log.info("stock balance mismatch productId={} has no snapshot row yet; skipped", productId);
+                }
             } catch (RuntimeException e) {
                 log.warn("stock balance rebuild failed productId={}", productId, e);
             }
