@@ -13,7 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 재고 이동·조회 구현. 장부 기록과 캐시 갱신을 한 트랜잭션으로 묶는 단일 창구.
+ * 재고 이동·조회 구현. 쓰기는 원장(inventory_tx) 추가만, 읽기는 스냅샷+미집계 차분
+ * (specs/2026-09-23-ledger-stock-design.md).
  */
 @Service
 @Transactional
@@ -49,40 +50,25 @@ public class InventoryService implements AvailableStockQuery, StockMovementRecor
 
     @Override
     public void recordInbound(String gtin, int qty) {
-        Product product = productForUpdate(gtin);
-        product.changeStockQty(product.stockQty() + qty);
         inventoryTxRepository.save(
-                new InventoryTx(product.id(), InventoryTx.TxType.INBOUND, qty, "STOCK_IN", null));
+                new InventoryTx(product(gtin).id(), InventoryTx.TxType.INBOUND, qty, "STOCK_IN", null));
     }
 
+    /** 포장 완료는 실물이 나갔다는 사실의 기록이다. 부족해도 막지 않는다 — 음수 잔고는 대조기가 보고한다 (D-L1). */
     @Override
     public void recordOutboundPacked(String gtin, int qty, long shipmentId) {
-        Product product = productForUpdate(gtin);
-        if (product.stockQty() < qty) {
-            throw new ApiException(ErrorCode.OUT_OF_STOCK, "재고가 부족합니다.",
-                    Map.of("gtin", gtin, "requested", qty, "available", product.stockQty()));
-        }
-        product.changeStockQty(product.stockQty() - qty);
         inventoryTxRepository.save(
-                new InventoryTx(product.id(), InventoryTx.TxType.OUTBOUND_PACKED, -qty, "SHIPMENT", shipmentId));
+                new InventoryTx(product(gtin).id(), InventoryTx.TxType.OUTBOUND_PACKED, -qty, "SHIPMENT", shipmentId));
     }
 
     @Override
     public void adjust(String gtin, int delta) {
-        Product product = productForUpdate(gtin);
-        product.changeStockQty(product.stockQty() + delta);
         inventoryTxRepository.save(
-                new InventoryTx(product.id(), InventoryTx.TxType.ADJUST, delta, null, null));
+                new InventoryTx(product(gtin).id(), InventoryTx.TxType.ADJUST, delta, null, null));
     }
 
     private Product product(String gtin) {
         return productRepository.findByGtin(gtin)
-                .orElseThrow(() -> notFound(gtin));
-    }
-
-    /** 쓰기 경로 전용 — 행 잠금으로 동시 증감의 lost update를 막는다. */
-    private Product productForUpdate(String gtin) {
-        return productRepository.findByGtinForUpdate(gtin)
                 .orElseThrow(() -> notFound(gtin));
     }
 

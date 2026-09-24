@@ -9,9 +9,8 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 
 /**
- * 센터 상품 (SKU). 테이블 주인은 P1 — 이 매핑은 P2·P3이 쓰는 읽기 컬럼과
- * 재고 캐시(stock_qty)까지만 담았다. 측정·등록 관련 컬럼은 P1이 확장한다.
- * stock_qty 갱신은 inventory의 StockMovementRecorder 단일 창구로만 한다.
+ * 센터 상품 (SKU). 테이블 주인은 P1 — 이 매핑은 P2·P3이 쓰는 읽기 컬럼을 담았다.
+ * 측정·등록 관련 컬럼은 P1이 확장한다.
  *
  * <p>medium_category_code, dim_status, dim_method 는 다른 엔티티(Category 등)를
  * 객체로 물지 않고 코드/문자열 값으로만 들고 있다 — 도메인 간 참조를 값으로만
@@ -81,9 +80,6 @@ public class Product {
 
     @Column(name = "dim_method")
     private String dimMethod;
-
-    @Column(name = "stock_qty", nullable = false)
-    private int stockQty;
 
     protected Product() {
     }
@@ -190,13 +186,5 @@ public class Product {
 
     public String dimMethod() {
         return dimMethod;
-    }
-
-    public int stockQty() {
-        return stockQty;
-    }
-
-    public void changeStockQty(int stockQty) {
-        this.stockQty = stockQty;
     }
 }

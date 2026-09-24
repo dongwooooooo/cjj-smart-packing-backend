@@ -88,9 +88,9 @@ public class ShipmentCompleteService {
             weightEstimator.verify(expectedWeightKg, measuredWeightKg);
         }
 
-        // 4. 상품 재고 차감 — inventory_tx(OUTBOUND_PACKED) 기록과 product.stock_qty 갱신은
-        // StockMovementRecorder 단일 창구에 위임한다(직접 짜지 않음). 재고 부족이면 이 호출이
-        // 곧바로 ApiException(OUT_OF_STOCK)을 던지고, 그 예외가 트랜잭션을 롤백시킨다.
+        // 4. 상품 재고 차감 — inventory_tx(OUTBOUND_PACKED) 기록은 StockMovementRecorder
+        // 단일 창구에 위임한다(직접 짜지 않음). 포장 완료는 실물이 나갔다는 사실의 기록이라
+        // 부족해도 막지 않는다(D-L1) — 음수 잔고는 정합성 대조기가 지표로 보고한다.
         for (ShipmentItem item : shipmentItemRepository.findByShipmentId(shipmentId)) {
             Product product = productRepository.findById(item.productId())
                     .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR,

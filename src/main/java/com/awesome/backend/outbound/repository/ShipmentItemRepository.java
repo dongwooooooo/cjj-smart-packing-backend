@@ -13,7 +13,7 @@ public interface ShipmentItemRepository extends JpaRepository<ShipmentItem, Long
 
     /**
      * 약속(soft allocation) 수량 — 포장이 끝나지 않은 배송단위에 담긴 수량 합.
-     * 가용재고 = stock_qty − 이 값 (concepts/inventory-allocation).
+     * 가용재고 = 실재고(원장) − 이 값 (concepts/inventory-allocation).
      */
     @Query("""
             select coalesce(sum(si.qty), 0) from ShipmentItem si
@@ -25,7 +25,7 @@ public interface ShipmentItemRepository extends JpaRepository<ShipmentItem, Long
 
     /**
      * 약속(soft allocation) 수량 — 포장이 끝나지 않은 배송단위에 담긴 수량 합.
-     * 가용재고 = stock_qty − 이 값 (concepts/inventory-allocation).
+     * 가용재고 = 실재고(원장) − 이 값 (concepts/inventory-allocation).
      */
     default int allocatedQty(Long productId) {
         return sumQtyByProductAndStatuses(productId,

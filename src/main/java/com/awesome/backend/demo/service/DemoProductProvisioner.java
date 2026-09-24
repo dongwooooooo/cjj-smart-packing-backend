@@ -4,6 +4,7 @@ import com.awesome.backend.demo.entity.DemoProduct;
 import com.awesome.backend.demo.repository.DemoProductRepository;
 import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.ProductRepository;
+import com.awesome.backend.inventory.service.AvailableStockQuery;
 import com.awesome.backend.inventory.service.InventoryService;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,14 +30,17 @@ public class DemoProductProvisioner {
     private final ProductRepository productRepository;
     private final DemoProductRepository demoProductRepository;
     private final InventoryService inventoryService;
+    private final AvailableStockQuery stockQuery;
 
     public DemoProductProvisioner(JdbcTemplate jdbcTemplate, ProductRepository productRepository,
                                   DemoProductRepository demoProductRepository,
-                                  InventoryService inventoryService) {
+                                  InventoryService inventoryService,
+                                  AvailableStockQuery stockQuery) {
         this.jdbcTemplate = jdbcTemplate;
         this.productRepository = productRepository;
         this.demoProductRepository = demoProductRepository;
         this.inventoryService = inventoryService;
+        this.stockQuery = stockQuery;
     }
 
     @Transactional
@@ -65,8 +69,7 @@ public class DemoProductProvisioner {
 
     /**
      * 입고 풀은 치수를 비우고 미확정으로, 출고 풀은 파일의 치수를 확정으로 넣는다.
-     * 재고는 0으로 되돌린다 — 리셋이 원장을 비웠으므로 캐시도 같이 0에서 시작해야
-     * 원장 합계와 어긋나지 않는다. 목표 수량은 뒤에서 원장을 거쳐 채운다.
+     * 재고는 목표 수량만큼 뒤에서 원장을 거쳐 채운다(alignStock).
      */
     private void upsertProduct(DemoProductSpec spec) {
         boolean outbound = spec.pool() == DemoProduct.Pool.OUTBOUND;
@@ -74,8 +77,8 @@ public class DemoProductProvisioner {
                 insert into product (gtin, name, medium_category_code, image_url, source,
                                      width_cm, length_cm, height_cm, weight_kg,
                                      dim_status, dim_method,
-                                     is_refrigerate, is_fragile, is_irregular, stock_qty)
-                values (?, ?, ?, ?, 'MASTER', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                                     is_refrigerate, is_fragile, is_irregular)
+                values (?, ?, ?, ?, 'MASTER', ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict (gtin) do update
                    set name = excluded.name,
                        medium_category_code = excluded.medium_category_code,
@@ -88,7 +91,6 @@ public class DemoProductProvisioner {
                        is_refrigerate = excluded.is_refrigerate,
                        is_fragile = excluded.is_fragile,
                        is_irregular = excluded.is_irregular,
-                       stock_qty = 0,
                        updated_at = now()
                 """,
                 spec.gtin(), spec.name(), spec.mediumCategoryCode(), Product.PLACEHOLDER_IMAGE_URL,
@@ -112,7 +114,6 @@ public class DemoProductProvisioner {
                 spec.imageDir());
     }
 
-    /** 목표 재고와의 차이만큼 보정 기록을 남긴다. 입고 풀은 목표가 0이라 남은 재고를 털어낸다. */
     /**
      * 지난 런에 있었지만 이번 products.json 에서 빠진 상품을 데모에서 뺀다.
      *
@@ -120,33 +121,38 @@ public class DemoProductProvisioner {
      * upsert 만 하고 있어서, 목록을 줄이면 예전 상품이 데모 풀에 그대로 남았다. 남은 상품은
      * 화면의 상품 수를 부풀리고, 사진이 이미 지워졌으면 촬영이 {@code NO_IMAGES} 로 실패한다.
      *
-     * <p>재고도 0 으로 되돌린다 — 리셋이 원장을 비웠으므로 캐시만 남아 있으면 원장 합계와
-     * 어긋난다. 상품 행 자체는 지우지 않는다. 마스터에 있던 상품이 사라질 이유는 없고,
+     * <p>재고도 0 으로 되돌린다 — 실재고가 0 이 아니면 원장에 보정 기록을 남겨 턴다.
+     * 상품 행 자체는 지우지 않는다. 마스터에 있던 상품이 사라질 이유는 없고,
      * 데모에서 빠졌을 뿐이다.
      */
     private void pruneDropped(List<DemoProductSpec> specs) {
         List<String> keep = specs.stream().map(DemoProductSpec::gtin).toList();
         if (keep.isEmpty()) {
-            jdbcTemplate.update("""
-                    update product set stock_qty = 0, updated_at = now()
-                     where gtin in (select gtin from demo_product)""");
+            zeroStock(jdbcTemplate.queryForList("select gtin from demo_product", String.class));
             jdbcTemplate.update("delete from demo_product");
             return;
         }
 
         String placeholders = String.join(",", java.util.Collections.nCopies(keep.size(), "?"));
         Object[] args = keep.toArray();
-        jdbcTemplate.update("""
-                update product set stock_qty = 0, updated_at = now()
-                 where gtin in (select gtin from demo_product where gtin not in (%s))"""
-                .formatted(placeholders), args);
+        zeroStock(jdbcTemplate.queryForList(
+                "select gtin from demo_product where gtin not in (%s)".formatted(placeholders),
+                String.class, args));
         jdbcTemplate.update(
                 "delete from demo_product where gtin not in (%s)".formatted(placeholders), args);
     }
 
+    private void zeroStock(List<String> gtins) {
+        for (String gtin : gtins) {
+            int onHand = stockQuery.onHandQty(gtin);
+            if (onHand != 0) {
+                inventoryService.adjust(gtin, -onHand);
+            }
+        }
+    }
+
     private void alignStock(DemoProductSpec spec) {
-        int current = productRepository.findByGtin(spec.gtin()).orElseThrow().stockQty();
-        int delta = spec.stockQty() - current;
+        int delta = spec.stockQty() - stockQuery.onHandQty(spec.gtin());
         if (delta != 0) {
             inventoryService.adjust(spec.gtin(), delta);
         }

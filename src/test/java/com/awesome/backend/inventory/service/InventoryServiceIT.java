@@ -1,10 +1,7 @@
 package com.awesome.backend.inventory.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.awesome.backend.common.error.ApiException;
-import com.awesome.backend.common.error.ErrorCode;
 import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.inventory.entity.InventoryTx;
 import com.awesome.backend.inventory.repository.InventoryTxRepository;
@@ -61,7 +58,7 @@ class InventoryServiceIT {
     }
 
     @Test
-    void 수량_입고는_장부_기록과_캐시_증가를_함께_한다() {
+    void 수량_입고는_원장에_기록되고_실재고에_반영된다() {
         inventoryService.recordInbound(JUICE, 10);
 
         assertThat(inventoryService.onHandQty(JUICE)).isEqualTo(10);
@@ -85,7 +82,7 @@ class InventoryServiceIT {
     }
 
     @Test
-    void 포장완료_차감은_장부와_캐시를_함께_줄인다() {
+    void 포장완료_차감은_원장에_기록되고_실재고를_줄인다() {
         inventoryService.recordInbound(JUICE, 10);
         Long productId = productRepository.findByGtin(JUICE).orElseThrow().id();
         Long shipmentId = plannedShipment(productId, 4);
@@ -101,12 +98,25 @@ class InventoryServiceIT {
     }
 
     @Test
-    void 재고보다_많은_차감은_거부한다() {
+    void 재고보다_많은_차감도_기록하고_실재고는_음수가_된다() {
         inventoryService.recordInbound(JUICE, 3);
+        inventoryService.recordOutboundPacked(JUICE, 5, 1L);
+        assertThat(inventoryService.onHandQty(JUICE)).isEqualTo(-2);
+    }
 
-        assertThatThrownBy(() -> inventoryService.recordOutboundPacked(JUICE, 5, 1L))
-                .isInstanceOfSatisfying(ApiException.class,
-                        e -> assertThat(e.code()).isEqualTo(ErrorCode.OUT_OF_STOCK));
+    @Test
+    void 쓰기_경로는_원장만_추가하고_상품_행을_갱신하지_않는다() {
+        Long productId = productRepository.findByGtin(JUICE).orElseThrow().id();
+        java.time.LocalDateTime before = jdbcTemplate.queryForObject(
+                "select updated_at from product where id = ?", java.time.LocalDateTime.class, productId);
+        inventoryService.recordInbound(JUICE, 10);
+        inventoryService.recordOutboundPacked(JUICE, 4, 1L);
+        inventoryService.adjust(JUICE, -1);
+        inventoryTxRepository.flush();
+        java.time.LocalDateTime after = jdbcTemplate.queryForObject(
+                "select updated_at from product where id = ?", java.time.LocalDateTime.class, productId);
+        assertThat(after).isEqualTo(before);
+        assertThat(inventoryService.onHandQty(JUICE)).isEqualTo(5);
     }
 
     private Long plannedShipment(Long productId, int qty) {

@@ -9,7 +9,7 @@ public interface StockMovementRecorder {
     /** 수량 입고 (P1 stock-in). 재고 증가의 유일한 경로 (D-09). */
     void recordInbound(String gtin, int qty);
 
-    /** 포장완료 차감 (P2). 부족 시 OUT_OF_STOCK. */
+    /** 포장완료 차감 (P2). 부족해도 기록한다 — 잔고가 음수가 되면 정합성 대조기가 지표로 보고한다 (D-L1). */
     void recordOutboundPacked(String gtin, int qty, long shipmentId);
 
     /** 관리자 보정 (부호 포함). */
