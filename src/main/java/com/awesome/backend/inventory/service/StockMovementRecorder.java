@@ -12,6 +12,9 @@ public interface StockMovementRecorder {
     /** 포장완료 차감 (P2). 부족해도 기록한다 — 잔고가 음수가 되면 정합성 대조기가 지표로 보고한다 (D-L1). */
     void recordOutboundPacked(String gtin, int qty, long shipmentId);
 
-    /** 관리자 보정 (부호 포함). */
-    void adjust(String gtin, int delta);
+    /** 관리자 보정 (부호 포함). 같은 키 재전송은 기존 기록을 돌려준다. 같은 키에 다른 delta 는 IDEMPOTENCY_CONFLICT. */
+    AdjustResult adjust(String gtin, int delta, String idempotencyKey, String reason);
+
+    record AdjustResult(long txId, int delta, boolean duplicated) {
+    }
 }

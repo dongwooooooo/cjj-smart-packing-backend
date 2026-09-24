@@ -42,6 +42,12 @@ public class InventoryTx {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "idempotency_key")
+    private String idempotencyKey;
+
+    @Column(name = "reason")
+    private String reason;
+
     protected InventoryTx() {
     }
 
@@ -54,11 +60,30 @@ public class InventoryTx {
         this.createdAt = LocalDateTime.now();
     }
 
+    /** 조정 전용 — 멱등 키와 사유를 남긴다. */
+    public InventoryTx(Long productId, int qtyDelta, String idempotencyKey, String reason) {
+        this(productId, TxType.ADJUST, qtyDelta, null, null);
+        this.idempotencyKey = idempotencyKey;
+        this.reason = reason;
+    }
+
+    public Long id() {
+        return id;
+    }
+
+    public Long productId() {
+        return productId;
+    }
+
     public TxType txType() {
         return txType;
     }
 
     public int qtyDelta() {
         return qtyDelta;
+    }
+
+    public String idempotencyKey() {
+        return idempotencyKey;
     }
 }

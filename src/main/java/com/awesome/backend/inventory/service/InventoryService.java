@@ -9,6 +9,7 @@ import com.awesome.backend.inventory.repository.InventoryTxRepository;
 import com.awesome.backend.inventory.repository.StockBalanceRepository;
 import com.awesome.backend.outbound.repository.ShipmentItemRepository;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,9 +63,20 @@ public class InventoryService implements AvailableStockQuery, StockMovementRecor
     }
 
     @Override
-    public void adjust(String gtin, int delta) {
-        inventoryTxRepository.save(
-                new InventoryTx(product(gtin).id(), InventoryTx.TxType.ADJUST, delta, null, null));
+    public AdjustResult adjust(String gtin, int delta, String idempotencyKey, String reason) {
+        Long productId = product(gtin).id();
+        Optional<InventoryTx> existing = inventoryTxRepository.findByIdempotencyKey(idempotencyKey);
+        if (existing.isPresent()) {
+            InventoryTx tx = existing.get();
+            if (tx.qtyDelta() != delta || !tx.productId().equals(productId)) {
+                throw new ApiException(ErrorCode.IDEMPOTENCY_CONFLICT,
+                        "같은 멱등 키로 다른 조정이 이미 기록돼 있습니다.",
+                        Map.of("idempotencyKey", idempotencyKey, "recordedDelta", tx.qtyDelta()));
+            }
+            return new AdjustResult(tx.id(), tx.qtyDelta(), true);
+        }
+        InventoryTx saved = inventoryTxRepository.save(new InventoryTx(productId, delta, idempotencyKey, reason));
+        return new AdjustResult(saved.id(), delta, false);
     }
 
     private Product product(String gtin) {

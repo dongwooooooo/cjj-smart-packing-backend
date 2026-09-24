@@ -62,8 +62,8 @@ class ShipmentCompleteDeadlockIT {
 
     @Test
     void 반대_순서_품목을_동시에_완료해도_둘_다_성공한다() throws Exception {
-        stockMovementRecorder.adjust(JUICE, 1_000);
-        stockMovementRecorder.adjust(GRAPE, 1_000);
+        stockMovementRecorder.adjust(JUICE, 1_000, "internal-" + java.util.UUID.randomUUID(), "test");
+        stockMovementRecorder.adjust(GRAPE, 1_000, "internal-" + java.util.UUID.randomUUID(), "test");
         long juice = productRepository.findByGtin(JUICE).orElseThrow().id();
         long grape = productRepository.findByGtin(GRAPE).orElseThrow().id();
 

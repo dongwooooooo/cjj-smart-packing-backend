@@ -27,7 +27,7 @@ public class StockTestSupport {
     public void set(String gtin, int qty) {
         int delta = qty - query.onHandQty(gtin);
         if (delta != 0) {
-            recorder.adjust(gtin, delta);
+            recorder.adjust(gtin, delta, "internal-" + java.util.UUID.randomUUID(), "test");
         }
     }
 

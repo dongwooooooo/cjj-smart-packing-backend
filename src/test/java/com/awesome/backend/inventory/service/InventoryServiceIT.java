@@ -113,7 +113,7 @@ class InventoryServiceIT {
 
         inventoryService.recordInbound(JUICE, 10);
         inventoryService.recordOutboundPacked(JUICE, 4, 1L);
-        inventoryService.adjust(JUICE, -1);
+        inventoryService.adjust(JUICE, -1, "internal-" + java.util.UUID.randomUUID(), "test");
         inventoryTxRepository.flush();
 
         Integer stockQtyAfter = jdbcTemplate.queryForObject(

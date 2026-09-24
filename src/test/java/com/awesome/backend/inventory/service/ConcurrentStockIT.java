@@ -56,6 +56,6 @@ class ConcurrentStockIT {
 
         assertThat(inventoryService.onHandQty(RAMEN)).isEqualTo(baseline + THREADS);
 
-        inventoryService.adjust(RAMEN, -THREADS); // 컨테이너 재사용 대비 원복
+        inventoryService.adjust(RAMEN, -THREADS, "internal-" + java.util.UUID.randomUUID(), "test"); // 컨테이너 재사용 대비 원복
     }
 }
