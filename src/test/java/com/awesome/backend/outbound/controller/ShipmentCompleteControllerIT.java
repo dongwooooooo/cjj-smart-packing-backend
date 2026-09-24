@@ -167,36 +167,24 @@ class ShipmentCompleteControllerIT {
     }
 
     @Test
-    void 상품_재고_부족이면_409_OUT_OF_STOCK이고_앞선_항목_반영도_전부_롤백된다()
-            throws IOException, InterruptedException {
+    void 상품_재고가_부족해도_완료되고_실재고는_음수가_된다() throws IOException, InterruptedException {
         Line line = lineRepository.findAll().get(0);
-        // 첫 항목(CHIP)은 재고가 충분해 정상 차감될 것 — 트랜잭션이 끝까지 커밋된다면.
-        // 두번째 항목(GRAPE)이 재고 부족으로 실패하면 CHIP의 차감도 함께 롤백돼야 한다.
-        setStock(CHIP, 10);
-        setStock(GRAPE, 2);
-        long chipProductId = productRepository.findByGtin(CHIP).orElseThrow().id();
-        long grapeProductId = productRepository.findByGtin(GRAPE).orElseThrow().id();
-        // setStock이 남긴 ADJUST 원장을 기준선으로 잡는다 — 이후 새 tx가 없으면 롤백된 것.
-        int chipTxCountBeforeComplete = inventoryTxRepository.findByProductIdOrderByIdAsc(chipProductId).size();
-
+        setStock(CHIP, 1);
+        setStock(GRAPE, 0);
+        long chipId = productRepository.findByGtin(CHIP).orElseThrow().id();
+        long grapeId = productRepository.findByGtin(GRAPE).orElseThrow().id();
         Shipment shipment = savePackingShipment(line, BOX_A, null);
-        shipmentItemRepository.save(new ShipmentItem(shipment.id(), chipProductId, 2));
-        shipmentItemRepository.save(new ShipmentItem(shipment.id(), grapeProductId, 5));
+        shipmentItemRepository.save(new ShipmentItem(shipment.id(), chipId, 1));
+        shipmentItemRepository.save(new ShipmentItem(shipment.id(), grapeId, 2));
         assignIdleTote(shipment.id());
 
         HttpResponse<String> response = post("/api/v1/shipments/" + shipment.id() + "/complete");
 
-        assertThat(response.statusCode()).isEqualTo(409);
-        assertThat(response.body()).contains("OUT_OF_STOCK");
-
-        // 부분 반영 없이 전부 롤백됐는지 확인.
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(stock.onHand(CHIP)).isZero();
+        assertThat(stock.onHand(GRAPE)).isEqualTo(-2);
         assertThat(shipmentRepository.findById(shipment.id()).orElseThrow().status())
-                .isEqualTo(Shipment.Status.PACKING);
-        assertThat(toteAssignmentRepository.findByShipmentIdAndReleasedAtIsNull(shipment.id())).isPresent();
-        // 먼저 처리됐어야 할 CHIP도 재고가 원래대로(트랜잭션 전체 롤백의 핵심 증거).
-        assertThat(stock.onHand(CHIP)).isEqualTo(10);
-        assertThat(inventoryTxRepository.findByProductIdOrderByIdAsc(chipProductId))
-                .hasSize(chipTxCountBeforeComplete);
+                .isEqualTo(Shipment.Status.PACKED);
     }
 
     @Test

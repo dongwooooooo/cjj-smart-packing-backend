@@ -2,7 +2,6 @@ package com.awesome.backend.outbound.service;
 
 import com.awesome.backend.common.error.ApiException;
 import com.awesome.backend.common.error.ErrorCode;
-import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.inventory.service.StockMovementRecorder;
 import com.awesome.backend.outbound.controller.ShipmentCompleteResponse;
@@ -25,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 포장 완료 처리 (3-8, "제일 중요하고 제일 어려운 API"). docs/02-api-spec.md 3-8.
  *
  * <p><b>왜 전부 한 트랜잭션인가</b>: 상태 전이, 상품 재고 차감(N건), 박스 재고 차감, 토트 할당
- * 해제 중 어느 하나라도 실패하면(예: 세 번째 상품에서 재고 부족) 앞서 성공한 나머지도 전부
+ * 해제 중 어느 하나라도 실패하면(예: 박스 재고 부족) 앞서 성공한 나머지도 전부
  * 롤백돼야 한다 — 안 그러면 "재고는 깎였는데 shipment는 여전히 PACKING" 같은 반쪽짜리 상태가
  * 남는다. {@code @Transactional} 메서드 안에서 unchecked exception({@link ApiException}도
  * {@link RuntimeException}이라 포함)이 새 나가면 Spring이 이 메서드가 시작한 물리 트랜잭션
@@ -88,20 +87,21 @@ public class ShipmentCompleteService {
             weightEstimator.verify(expectedWeightKg, measuredWeightKg);
         }
 
-        // 4. 상품 재고 차감 — inventory_tx(OUTBOUND_PACKED) 기록은 StockMovementRecorder
-        // 단일 창구에 위임한다(직접 짜지 않음). 포장 완료는 실물이 나갔다는 사실의 기록이라
-        // 부족해도 막지 않는다(D-L1) — 음수 잔고는 정합성 대조기가 지표로 보고한다.
+        // 4. 상품 재고 차감 — 원장 기록만. 상품 행을 읽거나 잠그지 않는다(D-L1, D-L3).
+        //    부족해도 막지 않는다. 포장 완료는 실물이 나갔다는 사실의 기록이고, 수용 판단은
+        //    출고지시 접수의 소프트 배정이 했다. 음수 잔고는 정합성 대조기가 지표로 올린다.
         for (ShipmentItem item : shipmentItemRepository.findByShipmentId(shipmentId)) {
-            Product product = productRepository.findById(item.productId())
+            String gtin = productRepository.findGtinById(item.productId())
                     .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR,
                             "shipment_item이 참조하는 상품을 찾을 수 없습니다: productId=" + item.productId()));
-            stockMovementRecorder.recordOutboundPacked(product.gtin(), item.qty(), shipmentId);
+            stockMovementRecorder.recordOutboundPacked(gtin, item.qty(), shipmentId);
         }
 
         // 5. 박스 재고 차감 — final_box 우선, 없으면 recommended_box. 행 잠금 조회
         // (findByIdForUpdate)로 가져온다 — 영속성 컨텍스트에 잠금 전 인스턴스가 남지 않도록
         // 엔티티를 먼저 로드하지 않는다. 여러 포장완료 요청이 같은 박스 재고를 동시에 깎을 때
-        // lost update를 막기 위해서다.
+        // lost update를 막기 위해서다. 이 트랜잭션이 잡는 행 락은 박스 한 행뿐이라 다른 완료와
+        // 순환 대기가 생기지 않는다.
         Long boxId = shipment.finalBoxId() != null ? shipment.finalBoxId() : shipment.recommendedBoxId();
         BoxType boxType = boxTypeRepository.findByIdForUpdate(boxId)
                 .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR,
