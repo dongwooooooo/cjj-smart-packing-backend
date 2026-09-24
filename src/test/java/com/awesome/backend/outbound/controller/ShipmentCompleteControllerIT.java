@@ -50,7 +50,7 @@ import tools.jackson.databind.ObjectMapper;
  * 데이터가 섞이지 않게 한다.
  *
  * <p>V2 seed 상품 6종 중 이 클래스는 4종을 시나리오별로 전담해 stock_qty 조작이 서로 간섭하지
- * 않게 한다: JUICE(정상 완료 — final_box 우선 확인), CHIP+GRAPE(상품 재고 부족 — 부분 롤백
+ * 않게 한다: JUICE(정상 완료 — final_box 우선 확인), CHIP+GRAPE(상품 재고 부족 — 완료되고 음수 재고 허용
  * 확인), PIE(박스 재고 부족 — recommended_box 경로 확인). box_type도 마찬가지로 A/B호는 정상
  * 완료 시나리오(추천 vs 확정) 확인용, C호는 재고를 0으로 강제해 박스 품절 시나리오 전담으로 쓴다.
  * 무게 검수 시나리오는 RAMEN + D호를 전담으로 쓴다.
