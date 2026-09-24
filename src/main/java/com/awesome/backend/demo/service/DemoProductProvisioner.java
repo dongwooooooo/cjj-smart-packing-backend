@@ -3,7 +3,6 @@ package com.awesome.backend.demo.service;
 import com.awesome.backend.demo.entity.DemoProduct;
 import com.awesome.backend.demo.repository.DemoProductRepository;
 import com.awesome.backend.inbound.entity.Product;
-import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.inventory.service.AvailableStockQuery;
 import com.awesome.backend.inventory.service.InventoryService;
 import java.util.List;
@@ -27,17 +26,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class DemoProductProvisioner {
 
     private final JdbcTemplate jdbcTemplate;
-    private final ProductRepository productRepository;
     private final DemoProductRepository demoProductRepository;
     private final InventoryService inventoryService;
     private final AvailableStockQuery stockQuery;
 
-    public DemoProductProvisioner(JdbcTemplate jdbcTemplate, ProductRepository productRepository,
+    public DemoProductProvisioner(JdbcTemplate jdbcTemplate,
                                   DemoProductRepository demoProductRepository,
                                   InventoryService inventoryService,
                                   AvailableStockQuery stockQuery) {
         this.jdbcTemplate = jdbcTemplate;
-        this.productRepository = productRepository;
         this.demoProductRepository = demoProductRepository;
         this.inventoryService = inventoryService;
         this.stockQuery = stockQuery;

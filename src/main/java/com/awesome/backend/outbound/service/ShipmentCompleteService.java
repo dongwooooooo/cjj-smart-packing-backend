@@ -98,9 +98,10 @@ public class ShipmentCompleteService {
             stockMovementRecorder.recordOutboundPacked(product.gtin(), item.qty(), shipmentId);
         }
 
-        // 5. 박스 재고 차감 — final_box 우선, 없으면 recommended_box. 동시성 보호를 위해 비관적
-        // 락 조회(findByIdForUpdate)로 가져온다(ProductRepository.findByGtinForUpdate와 같은 이유:
-        // 여러 포장완료 요청이 같은 박스 재고를 동시에 깎을 때 lost update 방지).
+        // 5. 박스 재고 차감 — final_box 우선, 없으면 recommended_box. 행 잠금 조회
+        // (findByIdForUpdate)로 가져온다 — 영속성 컨텍스트에 잠금 전 인스턴스가 남지 않도록
+        // 엔티티를 먼저 로드하지 않는다. 여러 포장완료 요청이 같은 박스 재고를 동시에 깎을 때
+        // lost update를 막기 위해서다.
         Long boxId = shipment.finalBoxId() != null ? shipment.finalBoxId() : shipment.recommendedBoxId();
         BoxType boxType = boxTypeRepository.findByIdForUpdate(boxId)
                 .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR,

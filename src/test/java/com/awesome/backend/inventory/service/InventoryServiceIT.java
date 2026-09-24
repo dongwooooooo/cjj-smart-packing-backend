@@ -107,16 +107,21 @@ class InventoryServiceIT {
     @Test
     void 쓰기_경로는_원장만_추가하고_상품_행을_갱신하지_않는다() {
         Long productId = productRepository.findByGtin(JUICE).orElseThrow().id();
-        java.time.LocalDateTime before = jdbcTemplate.queryForObject(
-                "select updated_at from product where id = ?", java.time.LocalDateTime.class, productId);
+        Integer stockQtyBefore = jdbcTemplate.queryForObject(
+                "select stock_qty from product where id = ?", Integer.class, productId);
+        int txCountBefore = inventoryTxRepository.findByProductIdOrderByIdAsc(productId).size();
+
         inventoryService.recordInbound(JUICE, 10);
         inventoryService.recordOutboundPacked(JUICE, 4, 1L);
         inventoryService.adjust(JUICE, -1);
         inventoryTxRepository.flush();
-        java.time.LocalDateTime after = jdbcTemplate.queryForObject(
-                "select updated_at from product where id = ?", java.time.LocalDateTime.class, productId);
-        assertThat(after).isEqualTo(before);
+
+        Integer stockQtyAfter = jdbcTemplate.queryForObject(
+                "select stock_qty from product where id = ?", Integer.class, productId);
+        assertThat(stockQtyAfter).isEqualTo(stockQtyBefore);
         assertThat(inventoryService.onHandQty(JUICE)).isEqualTo(5);
+        assertThat(inventoryTxRepository.findByProductIdOrderByIdAsc(productId))
+                .hasSize(txCountBefore + 3);
     }
 
     private Long plannedShipment(Long productId, int qty) {
