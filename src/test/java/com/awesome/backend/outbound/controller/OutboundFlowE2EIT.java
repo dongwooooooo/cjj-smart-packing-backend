@@ -18,6 +18,7 @@ import com.awesome.backend.outbound.repository.ShipmentItemRepository;
 import com.awesome.backend.outbound.repository.ShipmentRepository;
 import com.awesome.backend.outbound.repository.ToteAssignmentRepository;
 import com.awesome.backend.outbound.repository.ToteRepository;
+import com.awesome.backend.support.StockTestSupport;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -31,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -64,6 +66,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
+@Import(StockTestSupport.class)
 class OutboundFlowE2EIT {
 
     @Container
@@ -88,6 +91,7 @@ class OutboundFlowE2EIT {
     @Autowired BoxTypeRepository boxTypeRepository;
     @Autowired ToteRepository toteRepository;
     @Autowired ToteAssignmentRepository toteAssignmentRepository;
+    @Autowired StockTestSupport stock;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -196,8 +200,8 @@ class OutboundFlowE2EIT {
         int boxStockBefore = boxTypeRepository.findById(boxId).orElseThrow().stockQty();
         long ciderProductId = productRepository.findByGtin(CIDER).orElseThrow().id();
         long ramenProductId = productRepository.findByGtin(RAMEN).orElseThrow().id();
-        int ciderStockBefore = productRepository.findByGtin(CIDER).orElseThrow().stockQty();
-        int ramenStockBefore = productRepository.findByGtin(RAMEN).orElseThrow().stockQty();
+        int ciderStockBefore = stock.onHand(CIDER);
+        int ramenStockBefore = stock.onHand(RAMEN);
 
         HttpResponse<String> completeResponse = postNoBody("/api/v1/shipments/" + shipment.id() + "/complete");
         assertThat(completeResponse.statusCode()).isEqualTo(200);
@@ -208,10 +212,8 @@ class OutboundFlowE2EIT {
         assertThat(completeResult.status()).isEqualTo("PACKED");
         assertThat(completeResult.packedAt()).isNotNull();
 
-        assertThat(productRepository.findByGtin(CIDER).orElseThrow().stockQty())
-                .isEqualTo(ciderStockBefore - 3);
-        assertThat(productRepository.findByGtin(RAMEN).orElseThrow().stockQty())
-                .isEqualTo(ramenStockBefore - 2);
+        assertThat(stock.onHand(CIDER)).isEqualTo(ciderStockBefore - 3);
+        assertThat(stock.onHand(RAMEN)).isEqualTo(ramenStockBefore - 2);
 
         assertThat(inventoryTxRepository.findByProductIdOrderByIdAsc(ciderProductId))
                 .anySatisfy(tx -> {

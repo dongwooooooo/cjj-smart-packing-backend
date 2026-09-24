@@ -10,13 +10,16 @@ import com.awesome.backend.demo.repository.DemoOrderQueueRepository;
 import com.awesome.backend.demo.service.DemoDataException;
 import com.awesome.backend.demo.service.DemoDataLoader;
 import com.awesome.backend.demo.service.DemoProductProvisioner;
+import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.orders.repository.OrderRepository;
+import com.awesome.backend.support.StockTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -41,6 +44,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest(properties = "demo.prereleased-batches=0")
 @Testcontainers
+@Import(StockTestSupport.class)
 class DemoResetSequenceIT {
 
     @Container
@@ -53,7 +57,9 @@ class DemoResetSequenceIT {
     @Autowired WebApplicationContext context;
     @Autowired DemoOrderQueueRepository queueRepository;
     @Autowired OrderRepository orderRepository;
+    @Autowired ProductRepository productRepository;
     @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired StockTestSupport stock;
 
     @MockitoSpyBean DemoDataLoader loader;
     @MockitoSpyBean DemoProductProvisioner provisioner;
@@ -81,8 +87,11 @@ class DemoResetSequenceIT {
         jdbcTemplate.update("update box_type set stock_qty = 100");
         jdbcTemplate.update("""
                 update product set width_cm = null, length_cm = null, height_cm = null,
-                                   dim_status = 'NONE', dim_method = null, stock_qty = 0
+                                   dim_status = 'NONE', dim_method = null
                 """);
+        for (var product : productRepository.findAll()) {
+            stock.set(product.gtin(), 0);
+        }
     }
 
     private void reset() throws Exception {
@@ -164,15 +173,19 @@ class DemoResetSequenceIT {
 
     /** 상태를 비교 가능한 문자열로 — 두 번 리셋한 결과가 같은지 보는 용도. */
     private String statusSnapshot() {
-        return jdbcTemplate.queryForObject("""
+        String dbCounts = jdbcTemplate.queryForObject("""
                 select (select count(*) from orders) || '/' ||
                        (select count(*) from shipment) || '/' ||
                        (select count(*) from demo_order_queue where released_at is null) || '/' ||
                        (select count(*) from tote where status = 'IDLE') || '/' ||
                        (select count(*) from inventory_tx) || '/' ||
-                       (select coalesce(sum(stock_qty), 0) from product) || '/' ||
                        (select coalesce(sum(stock_qty), 0) from box_type)
                 """, String.class);
+        // 재고 합은 원장 창구(stock.onHand)로 — product.stock_qty 컬럼을 직접 읽지 않는다.
+        int productStockTotal = productRepository.findAll().stream()
+                .mapToInt(p -> stock.onHand(p.gtin()))
+                .sum();
+        return dbCounts + "/" + productStockTotal;
     }
 
     private int count(String sql) {

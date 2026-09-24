@@ -17,6 +17,7 @@ import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.outbound.entity.Tote;
 import com.awesome.backend.outbound.repository.BoxTypeRepository;
 import com.awesome.backend.outbound.repository.ToteRepository;
+import com.awesome.backend.support.StockTestSupport;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +45,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(properties = "demo.prepacked-shipments=0")
 @Testcontainers
 @Transactional
+@Import(StockTestSupport.class)
 class DemoResetIT {
 
     /** 배치 수는 파일이 정한다 — 시연 구성이 바뀌어도 테스트가 따라 깨지지 않게 한다. */
@@ -73,6 +76,7 @@ class DemoResetIT {
     @Autowired MeasurementSessionRepository measurementSessionRepository;
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired com.awesome.backend.demo.service.DemoDataProperties demoProperties;
+    @Autowired StockTestSupport stock;
 
     private MockMvc mvc;
 
@@ -134,9 +138,10 @@ class DemoResetIT {
                 values (?, '지난 런 잔여 상품', 'C1010', 'TEST', now())
                 on conflict (gtin) do nothing""", dropped);
         jdbcTemplate.update("""
-                insert into product (gtin, name, medium_category_code, image_url, source, dim_status, stock_qty)
-                values (?, '지난 런 잔여 상품', 'C1010', 'x', 'MASTER', 'NONE', 40)
-                on conflict (gtin) do update set stock_qty = 40""", dropped);
+                insert into product (gtin, name, medium_category_code, image_url, source, dim_status)
+                values (?, '지난 런 잔여 상품', 'C1010', 'x', 'MASTER', 'NONE')
+                on conflict (gtin) do nothing""", dropped);
+        stock.set(dropped, 40);
         jdbcTemplate.update("""
                 insert into demo_product (gtin, pool, gt_width_cm, gt_length_cm, gt_height_cm, image_dir)
                 values (?, 'INBOUND', 7.0, 7.0, 23.0, 'images/' || ?)
@@ -145,7 +150,7 @@ class DemoResetIT {
         reset();
 
         assertThat(demoProductRepository.findById(dropped)).isEmpty();
-        assertThat(productRepository.findByGtin(dropped).orElseThrow().stockQty()).isZero();
+        assertThat(stock.onHand(dropped)).isZero();
         // 파일에 있는 상품은 그대로 남는다
         assertThat(demoProductRepository.count()).isEqualTo(totalInFile());
     }
@@ -172,7 +177,7 @@ class DemoResetIT {
             Product product = productRepository.findByGtin(demo.gtin()).orElseThrow();
             assertThat(product.dimStatus()).isEqualTo(Product.DIM_STATUS_NONE);
             assertThat(product.widthCm()).isNull();
-            assertThat(product.stockQty()).isZero();
+            assertThat(stock.onHand(product.gtin())).isZero();
             assertThat(demo.gtWidthCm()).isNotNull();
             assertThat(demo.imageDir()).isNotBlank();
         }
@@ -188,7 +193,7 @@ class DemoResetIT {
             Product product = productRepository.findByGtin(demo.gtin()).orElseThrow();
             assertThat(product.dimStatus()).isEqualTo(Product.DIM_STATUS_CONFIRMED);
             assertThat(product.widthCm()).isNotNull();
-            assertThat(product.stockQty()).isPositive();
+            assertThat(stock.onHand(product.gtin())).isPositive();
         }
     }
 

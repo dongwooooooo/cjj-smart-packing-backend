@@ -12,8 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.awesome.backend.demo.repository.DemoOrderQueueRepository;
 import com.awesome.backend.demo.service.DemoAutoFeeder;
+import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.orders.repository.OrderRepository;
 import com.awesome.backend.orders.service.OrderImportService;
+import com.awesome.backend.support.StockTestSupport;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -43,6 +46,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest(properties = "demo.prereleased-batches=0")
 @Testcontainers
+@Import(StockTestSupport.class)
 class DemoAutoIT {
 
     @Container
@@ -56,8 +60,10 @@ class DemoAutoIT {
     @Autowired WebApplicationContext context;
     @Autowired DemoOrderQueueRepository queueRepository;
     @Autowired OrderRepository orderRepository;
+    @Autowired ProductRepository productRepository;
     @Autowired DemoAutoFeeder autoFeeder;
     @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired StockTestSupport stock;
 
     @MockitoSpyBean OrderImportService orderImportService;
 
@@ -84,8 +90,11 @@ class DemoAutoIT {
         jdbcTemplate.update("update box_type set stock_qty = 100");
         jdbcTemplate.update("""
                 update product set width_cm = null, length_cm = null, height_cm = null,
-                                   dim_status = 'NONE', dim_method = null, stock_qty = 0
+                                   dim_status = 'NONE', dim_method = null
                 """);
+        for (var product : productRepository.findAll()) {
+            stock.set(product.gtin(), 0);
+        }
     }
 
     @Test

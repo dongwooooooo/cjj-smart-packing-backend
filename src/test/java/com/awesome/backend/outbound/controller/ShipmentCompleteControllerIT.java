@@ -2,7 +2,6 @@ package com.awesome.backend.outbound.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.inventory.entity.InventoryTx;
 import com.awesome.backend.inventory.repository.InventoryTxRepository;
@@ -27,11 +26,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDateTime;
+import com.awesome.backend.support.StockTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -56,6 +57,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
+@Import(StockTestSupport.class)
 class ShipmentCompleteControllerIT {
 
     @Container
@@ -89,6 +91,7 @@ class ShipmentCompleteControllerIT {
     @Autowired BoxTypeRepository boxTypeRepository;
     @Autowired ToteRepository toteRepository;
     @Autowired ToteAssignmentRepository toteAssignmentRepository;
+    @Autowired StockTestSupport stock;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -119,8 +122,7 @@ class ShipmentCompleteControllerIT {
         assertThat(body.line().packedCount()).isEqualTo(actualPackedCount);
 
         // 상품 재고: 4개 차감.
-        Product juice = productRepository.findByGtin(JUICE).orElseThrow();
-        assertThat(juice.stockQty()).isEqualTo(16);
+        assertThat(stock.onHand(JUICE)).isEqualTo(16);
         assertThat(inventoryTxRepository.findByProductIdOrderByIdAsc(juiceProductId))
                 .anySatisfy(tx -> {
                     assertThat(tx.txType()).isEqualTo(InventoryTx.TxType.OUTBOUND_PACKED);
@@ -174,6 +176,8 @@ class ShipmentCompleteControllerIT {
         setStock(GRAPE, 2);
         long chipProductId = productRepository.findByGtin(CHIP).orElseThrow().id();
         long grapeProductId = productRepository.findByGtin(GRAPE).orElseThrow().id();
+        // setStock이 남긴 ADJUST 원장을 기준선으로 잡는다 — 이후 새 tx가 없으면 롤백된 것.
+        int chipTxCountBeforeComplete = inventoryTxRepository.findByProductIdOrderByIdAsc(chipProductId).size();
 
         Shipment shipment = savePackingShipment(line, BOX_A, null);
         shipmentItemRepository.save(new ShipmentItem(shipment.id(), chipProductId, 2));
@@ -190,8 +194,9 @@ class ShipmentCompleteControllerIT {
                 .isEqualTo(Shipment.Status.PACKING);
         assertThat(toteAssignmentRepository.findByShipmentIdAndReleasedAtIsNull(shipment.id())).isPresent();
         // 먼저 처리됐어야 할 CHIP도 재고가 원래대로(트랜잭션 전체 롤백의 핵심 증거).
-        assertThat(productRepository.findByGtin(CHIP).orElseThrow().stockQty()).isEqualTo(10);
-        assertThat(inventoryTxRepository.findByProductIdOrderByIdAsc(chipProductId)).isEmpty();
+        assertThat(stock.onHand(CHIP)).isEqualTo(10);
+        assertThat(inventoryTxRepository.findByProductIdOrderByIdAsc(chipProductId))
+                .hasSize(chipTxCountBeforeComplete);
     }
 
     @Test
@@ -200,6 +205,8 @@ class ShipmentCompleteControllerIT {
         Line line = lineRepository.findAll().get(0);
         setStock(PIE, 20);
         long pieProductId = productRepository.findByGtin(PIE).orElseThrow().id();
+        // setStock이 남긴 ADJUST 원장을 기준선으로 잡는다 — 이후 새 tx가 없으면 롤백된 것.
+        int pieTxCountBeforeComplete = inventoryTxRepository.findByProductIdOrderByIdAsc(pieProductId).size();
 
         // C호를 이 테스트 전용으로 0으로 강제 — final_box 없이 recommended_box(C호) 경로를 탄다.
         BoxType boxC = boxTypeRepository.findById(BOX_C).orElseThrow();
@@ -219,8 +226,9 @@ class ShipmentCompleteControllerIT {
                 .isEqualTo(Shipment.Status.PACKING);
         assertThat(toteAssignmentRepository.findByShipmentIdAndReleasedAtIsNull(shipment.id())).isPresent();
         // 상품 재고 차감(3단계)까지는 통과했지만 박스 재고 부족(4단계)으로 실패 — 롤백돼 원복돼야 한다.
-        assertThat(productRepository.findByGtin(PIE).orElseThrow().stockQty()).isEqualTo(20);
-        assertThat(inventoryTxRepository.findByProductIdOrderByIdAsc(pieProductId)).isEmpty();
+        assertThat(stock.onHand(PIE)).isEqualTo(20);
+        assertThat(inventoryTxRepository.findByProductIdOrderByIdAsc(pieProductId))
+                .hasSize(pieTxCountBeforeComplete);
         // 박스 재고는 여전히 0(더 깎이지 않음).
         assertThat(boxTypeRepository.findById(BOX_C).orElseThrow().stockQty()).isEqualTo(0);
     }
@@ -246,7 +254,7 @@ class ShipmentCompleteControllerIT {
         assertThat(body.status()).isEqualTo("PACKED");
         assertThat(body.expectedWeightKg())
                 .isEqualByComparingTo(RAMEN_WEIGHT_KG.multiply(BigDecimal.valueOf(3)));
-        assertThat(productRepository.findByGtin(RAMEN).orElseThrow().stockQty()).isEqualTo(17);
+        assertThat(stock.onHand(RAMEN)).isEqualTo(17);
     }
 
     @Test
@@ -256,6 +264,8 @@ class ShipmentCompleteControllerIT {
         Line line = lineRepository.findAll().get(0);
         setStock(RAMEN, 20);
         long ramenProductId = productRepository.findByGtin(RAMEN).orElseThrow().id();
+        // setStock이 남긴 ADJUST 원장을 기준선으로 잡는다 — 이후 새 tx가 없으면 롤백된 것.
+        int ramenTxCountBeforeComplete = inventoryTxRepository.findByProductIdOrderByIdAsc(ramenProductId).size();
         Shipment shipment = savePackingShipment(line, BOX_D, null);
         shipmentItemRepository.save(new ShipmentItem(shipment.id(), ramenProductId, 3));
         assignIdleTote(shipment.id());
@@ -272,15 +282,14 @@ class ShipmentCompleteControllerIT {
         // 재고·상태는 손대기 전에 막혔다
         assertThat(shipmentRepository.findById(shipment.id()).orElseThrow().status())
                 .isEqualTo(Shipment.Status.PACKING);
-        assertThat(productRepository.findByGtin(RAMEN).orElseThrow().stockQty()).isEqualTo(20);
-        assertThat(inventoryTxRepository.findByProductIdOrderByIdAsc(ramenProductId)).isEmpty();
+        assertThat(stock.onHand(RAMEN)).isEqualTo(20);
+        assertThat(inventoryTxRepository.findByProductIdOrderByIdAsc(ramenProductId))
+                .hasSize(ramenTxCountBeforeComplete);
         assertThat(boxTypeRepository.findById(BOX_D).orElseThrow().stockQty()).isEqualTo(boxStockBefore);
     }
 
     private void setStock(String gtin, int qty) {
-        Product product = productRepository.findByGtin(gtin).orElseThrow();
-        product.changeStockQty(qty);
-        productRepository.save(product);
+        stock.set(gtin, qty);
     }
 
     /** PACKING 상태 + 유일한 order로 shipment를 만든다. finalBoxId는 null 허용. */

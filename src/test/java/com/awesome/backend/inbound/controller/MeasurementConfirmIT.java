@@ -10,6 +10,7 @@ import com.awesome.backend.inbound.entity.MeasurementStatus;
 import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.MeasurementSessionRepository;
 import com.awesome.backend.inbound.repository.ProductRepository;
+import com.awesome.backend.support.StockTestSupport;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -40,6 +42,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 })
 @Testcontainers
 @Transactional
+@Import(StockTestSupport.class)
 class MeasurementConfirmIT {
 
     @Container
@@ -54,6 +57,7 @@ class MeasurementConfirmIT {
     @Autowired WebApplicationContext context;
     @Autowired ProductRepository productRepository;
     @Autowired MeasurementSessionRepository sessionRepository;
+    @Autowired StockTestSupport stock;
     @PersistenceContext EntityManager em;
 
     private MockMvc mvc;
@@ -210,7 +214,7 @@ class MeasurementConfirmIT {
     void 확정은_재고를_건드리지_않는다() throws Exception {
         // D-09: 재고 증가는 1-5 stock-in 한 곳뿐이다
         Long productId = juiceId();
-        int before = productRepository.findById(productId).orElseThrow().stockQty();
+        int before = stock.onHandByProductId(productId);
         Long sessionId = openSession(productId);
 
         mvc.perform(post(confirmPath(sessionId)).contentType(MediaType.APPLICATION_JSON)
@@ -219,7 +223,7 @@ class MeasurementConfirmIT {
 
         em.flush();
         em.clear();
-        assertThat(productRepository.findById(productId).orElseThrow().stockQty()).isEqualTo(before);
+        assertThat(stock.onHandByProductId(productId)).isEqualTo(before);
     }
 
     @Test

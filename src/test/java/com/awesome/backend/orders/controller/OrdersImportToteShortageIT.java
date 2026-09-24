@@ -4,17 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.ProductRepository;
-import com.awesome.backend.inventory.service.AvailableStockQuery;
-import com.awesome.backend.inventory.service.StockMovementRecorder;
 import com.awesome.backend.orders.repository.OrderRepository;
+import com.awesome.backend.support.StockTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,6 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest
 @Testcontainers
+@Import(StockTestSupport.class)
 class OrdersImportToteShortageIT {
 
     @Container
@@ -46,8 +46,7 @@ class OrdersImportToteShortageIT {
     @Autowired WebApplicationContext context;
     @Autowired OrderRepository orderRepository;
     @Autowired ProductRepository productRepository;
-    @Autowired StockMovementRecorder stockMovementRecorder;
-    @Autowired AvailableStockQuery stockQuery;
+    @Autowired StockTestSupport stock;
     @Autowired JdbcTemplate jdbcTemplate;
 
     private MockMvc mvc;
@@ -60,7 +59,7 @@ class OrdersImportToteShortageIT {
                                    dim_status = 'CONFIRMED'
                 where gtin = ?
                 """, CHIP);
-        setOnHandQty(CHIP, 10);
+        stock.set(CHIP, 10);
     }
 
     @AfterEach
@@ -76,16 +75,8 @@ class OrdersImportToteShortageIT {
                 update product set width_cm = null, length_cm = null, height_cm = null,
                                    dim_status = 'NONE'
                 """);
-        for (Product product : productRepository.findAll()) {
-            setOnHandQty(product.gtin(), 0);
-        }
-    }
-
-    /** 원장(재고 창구)을 경유해 실재고를 목표값으로 맞춘다 — 읽기 경로가 원장을 보므로 직접 SQL 로는 안 된다. */
-    private void setOnHandQty(String gtin, int target) {
-        int delta = target - stockQuery.onHandQty(gtin);
-        if (delta != 0) {
-            stockMovementRecorder.adjust(gtin, delta);
+        for (var product : productRepository.findAll()) {
+            stock.set(product.gtin(), 0);
         }
     }
 
