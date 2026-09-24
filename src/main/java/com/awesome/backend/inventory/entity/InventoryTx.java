@@ -39,7 +39,11 @@ public class InventoryTx {
     @Column(name = "ref_id")
     private Long refId;
 
-    @Column(name = "created_at", nullable = false)
+    /**
+     * DB 가 INSERT 순간의 clock_timestamp() 로 채운다 (V22). 집계기의 정착 창이 이 값을 기준으로
+     * 삼으므로 JVM 시계를 쓰지 않는다. INSERT 에서 빠지므로 저장 직후 엔티티에서는 null 이다.
+     */
+    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "idempotency_key")
@@ -57,7 +61,6 @@ public class InventoryTx {
         this.qtyDelta = qtyDelta;
         this.refType = refType;
         this.refId = refId;
-        this.createdAt = LocalDateTime.now();
     }
 
     /** 조정 전용 — 멱등 키와 사유를 남긴다. */

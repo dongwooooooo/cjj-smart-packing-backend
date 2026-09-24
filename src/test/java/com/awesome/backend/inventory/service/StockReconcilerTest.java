@@ -24,7 +24,9 @@ class StockReconcilerTest {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         TransactionTemplate transactionTemplate = new TransactionTemplate(mock(PlatformTransactionManager.class));
-        StockReconciler reconciler = new StockReconciler(jdbcTemplate, transactionTemplate, registry);
+        InventoryProperties properties = new InventoryProperties(
+                new InventoryProperties.Collector(5000, 60), new InventoryProperties.Reconciler(60000));
+        StockReconciler reconciler = new StockReconciler(jdbcTemplate, transactionTemplate, properties, registry);
 
         Map<String, Object> row1 = new LinkedHashMap<>();
         row1.put("product_id", 1L);
@@ -37,15 +39,15 @@ class StockReconcilerTest {
         when(jdbcTemplate.queryForList(StockReconciler.MISMATCHES)).thenReturn(List.of(row1, row2));
 
         doThrow(new DataAccessResourceFailureException("boom"))
-                .when(jdbcTemplate).update(eq(StockReconciler.REBUILD), eq(1L), eq(1L), eq(1L));
-        when(jdbcTemplate.update(eq(StockReconciler.REBUILD), eq(2L), eq(2L), eq(2L))).thenReturn(1);
+                .when(jdbcTemplate).update(eq(StockReconciler.REBUILD), eq(1L), eq(60L), eq(1L), eq(60L), eq(1L));
+        when(jdbcTemplate.update(eq(StockReconciler.REBUILD), eq(2L), eq(60L), eq(2L), eq(60L), eq(2L))).thenReturn(1);
 
         when(jdbcTemplate.queryForObject(StockReconciler.NEGATIVE, Long.class)).thenReturn(0L);
 
         int fixed = reconciler.reconcileOnce();
 
         assertThat(fixed).isEqualTo(1);
-        verify(jdbcTemplate).update(eq(StockReconciler.REBUILD), eq(2L), eq(2L), eq(2L));
+        verify(jdbcTemplate).update(eq(StockReconciler.REBUILD), eq(2L), eq(60L), eq(2L), eq(60L), eq(2L));
         assertThat(registry.get("inventory.reconcile.mismatch").gauge().value()).isEqualTo(2.0);
         assertThat(registry.get("inventory.balance.negative").gauge().value()).isEqualTo(0.0);
     }

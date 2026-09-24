@@ -17,6 +17,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 유도한 값이라 어긋남의 원인은 코드 버그나 직접 SQL 뿐이고, 원장을 진실로 두고 스냅샷을
  * 다시 만드는 것이 안전하다 (D-L6). 원장은 고치지 않는다. 상품별 복구는 각자 독립된
  * 트랜잭션으로 실행해, 한 상품의 복구 실패가 다른 상품의 복구를 막지 않는다 (spec 7절).
+ *
+ * <p>MISMATCHES 는 같은 스냅샷 안에서 {@code qty + Σ(id > last_tx_id)} 와 원장 전체 합을 비교하므로
+ * 정착 창과 무관하게 성립한다. REBUILD 는 커서를 집계기와 같은 정착 규칙으로 정한다. 복구는
+ * {@code transactionTemplate} 으로 감싸므로 {@code reconcile()} 의 자기 호출과 무관하게 상품마다
+ * 트랜잭션 경계가 있다.
  */
 @Component
 public class StockReconciler {
@@ -33,31 +38,52 @@ public class StockReconciler {
                 <> COALESCE(SUM(t.qty_delta), 0)
             """;
 
+    /**
+     * 원장 기준으로 스냅샷을 다시 만든다. 커서는 집계기와 같은 정착 규칙으로 정한다 — 원장 전체의
+     * {@code MAX(id)} 로 두면 아직 커밋되지 않은 더 작은 id 행을 영원히 건너뛸 수 있다
+     * (StockBalanceCollector 클래스 주석). 정착한 행이 없으면 {@code (0, 0)}.
+     * 파라미터: 정착 창(초), 상품 id, 정착 창(초), 상품 id, 상품 id.
+     */
     static final String REBUILD = """
-            UPDATE stock_balance
-               SET qty = (SELECT COALESCE(SUM(qty_delta), 0) FROM inventory_tx WHERE product_id = ?),
-                   last_tx_id = (SELECT COALESCE(MAX(id), 0) FROM inventory_tx WHERE product_id = ?),
+            UPDATE stock_balance b
+               SET qty = (SELECT COALESCE(SUM(t.qty_delta), 0) FROM inventory_tx t
+                           WHERE t.product_id = b.product_id AND t.id <= s.new_last),
+                   last_tx_id = s.new_last,
                    computed_at = now()
-             WHERE product_id = ?
+              FROM (
+                SELECT COALESCE((SELECT MAX(t.id) FROM inventory_tx t
+                                  WHERE t.product_id = ?
+                                    AND t.created_at < statement_timestamp() - make_interval(secs => ?::float8)
+                                    AND t.id < COALESCE((SELECT MIN(y.id) FROM inventory_tx y
+                                                          WHERE y.product_id = ?
+                                                            AND y.created_at >= statement_timestamp()
+                                                                                - make_interval(secs => ?::float8)),
+                                                        9223372036854775807)), 0) AS new_last
+              ) s
+             WHERE b.product_id = ?
             """;
 
     static final String NEGATIVE = "SELECT COUNT(*) FROM v_stock_on_hand WHERE on_hand_qty < 0";
 
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
+    private final long settleSeconds;
     private final AtomicLong mismatch = new AtomicLong();
     private final AtomicLong negative = new AtomicLong();
 
-    public StockReconciler(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate, MeterRegistry registry) {
+    public StockReconciler(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate,
+                           InventoryProperties properties, MeterRegistry registry) {
         this.jdbcTemplate = jdbcTemplate;
         this.transactionTemplate = transactionTemplate;
+        this.settleSeconds = properties.collector().settleSeconds();
         Gauge.builder("inventory.reconcile.mismatch", mismatch, AtomicLong::get)
                 .description("마지막 대조에서 원장과 어긋난 상품 수").register(registry);
         Gauge.builder("inventory.balance.negative", negative, AtomicLong::get)
                 .description("실재고가 음수인 상품 수 — 실물과 장부가 어긋났다는 신호").register(registry);
     }
 
-    @Scheduled(fixedDelayString = "${inventory.reconciler.interval-ms:60000}")
+    @Scheduled(initialDelayString = "${inventory.reconciler.interval-ms:60000}",
+            fixedDelayString = "${inventory.reconciler.interval-ms:60000}")
     public void reconcile() {
         try {
             reconcileOnce();
@@ -74,7 +100,7 @@ public class StockReconciler {
             long productId = ((Number) row.get("product_id")).longValue();
             try {
                 transactionTemplate.executeWithoutResult(
-                        status -> jdbcTemplate.update(REBUILD, productId, productId, productId));
+                        status -> jdbcTemplate.update(REBUILD, productId, settleSeconds, productId, settleSeconds, productId));
                 fixed++;
                 log.warn("stock balance mismatch productId={} derived={} ledgerTotal={} -> rebuilt from ledger",
                         productId, row.get("derived"), row.get("ledger_total"));

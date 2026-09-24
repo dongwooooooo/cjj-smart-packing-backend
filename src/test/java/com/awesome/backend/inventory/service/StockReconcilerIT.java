@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.inventory.entity.InventoryTx;
+import com.awesome.backend.inventory.entity.StockBalance;
 import com.awesome.backend.inventory.repository.InventoryTxRepository;
 import com.awesome.backend.inventory.repository.StockBalanceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -18,7 +19,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(properties = {
         "inventory.collector.interval-ms=3600000",
-        "inventory.reconciler.interval-ms=3600000"})
+        "inventory.reconciler.interval-ms=3600000",
+        "inventory.collector.settle-seconds=0"})
 @Testcontainers
 class StockReconcilerIT {
 
@@ -48,6 +50,11 @@ class StockReconcilerIT {
 
         assertThat(fixed).isEqualTo(1);
         assertThat(stockBalanceRepository.onHandQty(productId)).isEqualTo(ledgerTotal);
+        Long maxId = jdbcTemplate.queryForObject(
+                "select coalesce(max(id),0) from inventory_tx where product_id = ?", Long.class, productId);
+        StockBalance rebuilt = stockBalanceRepository.findByProductId(productId).orElseThrow();
+        assertThat(rebuilt.qty()).isEqualTo(ledgerTotal);
+        assertThat(rebuilt.lastTxId()).isEqualTo(maxId);
         assertThat(registry.get("inventory.reconcile.mismatch").gauge().value()).isEqualTo(1.0);
     }
 

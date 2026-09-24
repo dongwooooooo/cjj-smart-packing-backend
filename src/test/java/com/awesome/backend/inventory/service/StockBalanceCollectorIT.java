@@ -22,7 +22,10 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** 클래스 레벨 @Transactional 없음 — 집계기는 커밋된 원장만 봐야 한다. */
-@SpringBootTest(properties = "inventory.collector.interval-ms=3600000")
+@SpringBootTest(properties = {
+        "inventory.collector.interval-ms=3600000",
+        // 집계 산술·동시성만 본다. 정착 창은 StockBalanceCollectorSettleIT 가 따로 검증한다.
+        "inventory.collector.settle-seconds=0"})
 @Testcontainers
 class StockBalanceCollectorIT {
 
