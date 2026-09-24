@@ -77,6 +77,7 @@ class DemoResetIT {
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired com.awesome.backend.demo.service.DemoDataProperties demoProperties;
     @Autowired StockTestSupport stock;
+    @Autowired com.awesome.backend.inventory.service.StockBalanceCollector stockBalanceCollector;
 
     private MockMvc mvc;
 
@@ -298,5 +299,28 @@ class DemoResetIT {
 
         assertThat(measurementSessionRepository.findAll())
                 .noneMatch(MeasurementSession::isOpen);
+    }
+
+    @Test
+    void 리셋_뒤_실재고는_시연_명세_수량과_같고_스냅샷은_원장과_일치한다() throws Exception {
+        // 첫 리셋 직후에는 stock_balance 에 아직 행이 없다 — 실서비스에서는 이 행을
+        // StockBalanceCollector 가 리셋 뒤 몇 초 안에 원장을 읽어 만든다. 이 집계를
+        // 같은 트랜잭션 안에서 직접 불러 그 상태를 흉내낸다.
+        mvc.perform(post(RESET)).andExpect(status().isOk());
+        stockBalanceCollector.collectOnce();
+
+        // 진짜 문제는 두 번째 리셋(시연을 다시 준비하려고 또 누르는 경우)부터 드러난다.
+        // clearDemoData 가 원장만 지우고 스냅샷을 그대로 두면, alignStock 이 옛 스냅샷
+        // 기준으로 delta 를 0으로 계산해 넘어가고, 스냅샷의 last_tx_id 는 방금 지워진
+        // 원장 행을 가리킨 채 남는다.
+        mvc.perform(post(RESET)).andExpect(status().isOk());
+
+        Long mismatches = jdbcTemplate.queryForObject("""
+                select count(*) from stock_balance b
+                 where b.qty + coalesce((select sum(t.qty_delta) from inventory_tx t
+                                          where t.product_id = b.product_id and t.id > b.last_tx_id), 0)
+                    <> coalesce((select sum(t.qty_delta) from inventory_tx t where t.product_id = b.product_id), 0)
+                """, Long.class);
+        assertThat(mismatches).isZero();
     }
 }
