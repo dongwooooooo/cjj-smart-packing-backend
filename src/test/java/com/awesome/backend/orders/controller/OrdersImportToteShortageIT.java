@@ -4,13 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.orders.repository.OrderRepository;
+import com.awesome.backend.support.StockTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,6 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest
 @Testcontainers
+@Import(StockTestSupport.class)
 class OrdersImportToteShortageIT {
 
     @Container
@@ -41,6 +45,8 @@ class OrdersImportToteShortageIT {
 
     @Autowired WebApplicationContext context;
     @Autowired OrderRepository orderRepository;
+    @Autowired ProductRepository productRepository;
+    @Autowired StockTestSupport stock;
     @Autowired JdbcTemplate jdbcTemplate;
 
     private MockMvc mvc;
@@ -50,9 +56,10 @@ class OrdersImportToteShortageIT {
         mvc = MockMvcBuilders.webAppContextSetup(context).build();
         jdbcTemplate.update("""
                 update product set width_cm = 5.0, length_cm = 5.0, height_cm = 2.0,
-                                   dim_status = 'CONFIRMED', stock_qty = 10
+                                   dim_status = 'CONFIRMED'
                 where gtin = ?
                 """, CHIP);
+        stock.set(CHIP, 10);
     }
 
     @AfterEach
@@ -66,8 +73,11 @@ class OrdersImportToteShortageIT {
         jdbcTemplate.update("update tote set status = 'IDLE'");
         jdbcTemplate.update("""
                 update product set width_cm = null, length_cm = null, height_cm = null,
-                                   dim_status = 'NONE', stock_qty = 0
+                                   dim_status = 'NONE'
                 """);
+        for (var product : productRepository.findAll()) {
+            stock.set(product.gtin(), 0);
+        }
     }
 
     @Test

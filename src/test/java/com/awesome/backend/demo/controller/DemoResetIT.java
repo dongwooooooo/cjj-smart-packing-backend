@@ -17,6 +17,7 @@ import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.outbound.entity.Tote;
 import com.awesome.backend.outbound.repository.BoxTypeRepository;
 import com.awesome.backend.outbound.repository.ToteRepository;
+import com.awesome.backend.support.StockTestSupport;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,9 +42,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * 포장이 재고와 박스를 쓰기 시작하면 무엇이 리셋의 결과인지 가려진다.
  * 미리 포장하는 동작은 DemoPrepackIT 가 본다.
  */
-@SpringBootTest(properties = "demo.prepacked-shipments=0")
+@SpringBootTest(properties = {
+        "demo.prepacked-shipments=0",
+        // 첫 리셋 뒤 집계가 방금 쓴 원장을 바로 접어야 두 번째 리셋의 옛 스냅샷 회귀를 재현할 수 있다.
+        "inventory.collector.settle-seconds=0"})
 @Testcontainers
 @Transactional
+@Import(StockTestSupport.class)
 class DemoResetIT {
 
     /** 배치 수는 파일이 정한다 — 시연 구성이 바뀌어도 테스트가 따라 깨지지 않게 한다. */
@@ -73,6 +79,8 @@ class DemoResetIT {
     @Autowired MeasurementSessionRepository measurementSessionRepository;
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired com.awesome.backend.demo.service.DemoDataProperties demoProperties;
+    @Autowired StockTestSupport stock;
+    @Autowired com.awesome.backend.inventory.service.StockBalanceCollector stockBalanceCollector;
 
     private MockMvc mvc;
 
@@ -134,9 +142,10 @@ class DemoResetIT {
                 values (?, '지난 런 잔여 상품', 'C1010', 'TEST', now())
                 on conflict (gtin) do nothing""", dropped);
         jdbcTemplate.update("""
-                insert into product (gtin, name, medium_category_code, image_url, source, dim_status, stock_qty)
-                values (?, '지난 런 잔여 상품', 'C1010', 'x', 'MASTER', 'NONE', 40)
-                on conflict (gtin) do update set stock_qty = 40""", dropped);
+                insert into product (gtin, name, medium_category_code, image_url, source, dim_status)
+                values (?, '지난 런 잔여 상품', 'C1010', 'x', 'MASTER', 'NONE')
+                on conflict (gtin) do nothing""", dropped);
+        stock.set(dropped, 40);
         jdbcTemplate.update("""
                 insert into demo_product (gtin, pool, gt_width_cm, gt_length_cm, gt_height_cm, image_dir)
                 values (?, 'INBOUND', 7.0, 7.0, 23.0, 'images/' || ?)
@@ -145,7 +154,7 @@ class DemoResetIT {
         reset();
 
         assertThat(demoProductRepository.findById(dropped)).isEmpty();
-        assertThat(productRepository.findByGtin(dropped).orElseThrow().stockQty()).isZero();
+        assertThat(stock.onHand(dropped)).isZero();
         // 파일에 있는 상품은 그대로 남는다
         assertThat(demoProductRepository.count()).isEqualTo(totalInFile());
     }
@@ -172,7 +181,7 @@ class DemoResetIT {
             Product product = productRepository.findByGtin(demo.gtin()).orElseThrow();
             assertThat(product.dimStatus()).isEqualTo(Product.DIM_STATUS_NONE);
             assertThat(product.widthCm()).isNull();
-            assertThat(product.stockQty()).isZero();
+            assertThat(stock.onHand(product.gtin())).isZero();
             assertThat(demo.gtWidthCm()).isNotNull();
             assertThat(demo.imageDir()).isNotBlank();
         }
@@ -188,7 +197,7 @@ class DemoResetIT {
             Product product = productRepository.findByGtin(demo.gtin()).orElseThrow();
             assertThat(product.dimStatus()).isEqualTo(Product.DIM_STATUS_CONFIRMED);
             assertThat(product.widthCm()).isNotNull();
-            assertThat(product.stockQty()).isPositive();
+            assertThat(stock.onHand(product.gtin())).isPositive();
         }
     }
 
@@ -293,5 +302,31 @@ class DemoResetIT {
 
         assertThat(measurementSessionRepository.findAll())
                 .noneMatch(MeasurementSession::isOpen);
+    }
+
+    @Test
+    void 리셋_뒤_실재고는_시연_명세_수량과_같고_스냅샷은_원장과_일치한다() throws Exception {
+        // 리셋 직후에는 stock_balance 에 행이 없다(리셋이 지운다) — 실서비스에서는 이 행을
+        // StockBalanceCollector 가 리셋 뒤 몇 초 안에 만든다. 테스트는 클래스 레벨 @Transactional 이라
+        // 집계를 테스트 트랜잭션 안에서 직접 불러 그 상태를 흉내낸다.
+        mvc.perform(post(RESET)).andExpect(status().isOk());
+        stockBalanceCollector.collectOnce();
+
+        // 진짜 문제는 두 번째 리셋(시연을 다시 준비하려고 또 누르는 경우)부터 드러난다.
+        // clearDemoData 가 원장만 지우고 스냅샷을 그대로 두면, alignStock 이 옛 스냅샷
+        // 기준으로 delta 를 0으로 계산해 넘어가고, 스냅샷의 last_tx_id 는 방금 지워진
+        // 원장 행을 가리킨 채 남는다.
+        mvc.perform(post(RESET)).andExpect(status().isOk());
+        stockBalanceCollector.collectOnce();
+
+        assertThat(jdbcTemplate.queryForObject("select count(*) from stock_balance", Long.class))
+                .isEqualTo(jdbcTemplate.queryForObject("select count(*) from product", Long.class));
+        Long mismatches = jdbcTemplate.queryForObject("""
+                select count(*) from stock_balance b
+                 where b.qty + coalesce((select sum(t.qty_delta) from inventory_tx t
+                                          where t.product_id = b.product_id and t.id > b.last_tx_id), 0)
+                    <> coalesce((select sum(t.qty_delta) from inventory_tx t where t.product_id = b.product_id), 0)
+                """, Long.class);
+        assertThat(mismatches).isZero();
     }
 }

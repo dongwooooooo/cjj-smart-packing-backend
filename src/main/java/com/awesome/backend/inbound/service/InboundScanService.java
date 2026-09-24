@@ -10,6 +10,7 @@ import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.CategoryRepository;
 import com.awesome.backend.inbound.repository.KoreanNetMasterRepository;
 import com.awesome.backend.inbound.repository.ProductRepository;
+import com.awesome.backend.inventory.service.AvailableStockQuery;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -23,14 +24,17 @@ public class InboundScanService {
     private final KoreanNetMasterRepository koreanNetMasterRepository;
     private final CategoryRepository categoryRepository;
     private final MasterImageSource masterImages;
+    private final AvailableStockQuery stockQuery;
 
     public InboundScanService(ProductRepository productRepository,
                               KoreanNetMasterRepository koreanNetMasterRepository,
-                              CategoryRepository categoryRepository, MasterImageSource masterImages) {
+                              CategoryRepository categoryRepository, MasterImageSource masterImages,
+                              AvailableStockQuery stockQuery) {
         this.productRepository = productRepository;
         this.koreanNetMasterRepository = koreanNetMasterRepository;
         this.categoryRepository = categoryRepository;
         this.masterImages = masterImages;
+        this.stockQuery = stockQuery;
     }
 
     /**
@@ -50,14 +54,16 @@ public class InboundScanService {
             ScanJudgment judgment = product.hasConfirmedDimensions()
                     ? ScanJudgment.REGISTERED
                     : ScanJudgment.NEW;
-            return ScanResponse.of(judgment, ProductSummary.from(product, categoryOf(product), masterImages.urlFor(product)));
+            return ScanResponse.of(judgment, ProductSummary.from(product, categoryOf(product),
+                    masterImages.urlFor(product), stockQuery.onHandQty(product.gtin())));
         }
 
         return koreanNetMasterRepository.findByGtin(barcode)
                 .map(master -> {
                     Product created = productRepository.save(
                             Product.fromMaster(master, resolveImageUrl(master)));
-                    return ScanResponse.of(ScanJudgment.NEW, ProductSummary.from(created, categoryOf(created), masterImages.urlFor(created)));
+                    return ScanResponse.of(ScanJudgment.NEW, ProductSummary.from(created, categoryOf(created),
+                            masterImages.urlFor(created), stockQuery.onHandQty(created.gtin())));
                 })
                 .orElseGet(ScanResponse::unknown);
     }

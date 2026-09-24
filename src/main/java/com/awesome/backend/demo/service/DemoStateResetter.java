@@ -45,6 +45,11 @@ public class DemoStateResetter {
         jdbcTemplate.update("delete from measurement_image");
         jdbcTemplate.update("delete from measurement_session");
         jdbcTemplate.update("delete from inventory_tx");
+        // 원장을 비웠으므로 스냅샷 행도 지운다 — 행이 없으면 실재고 조회는 (0, 0) 으로 계산하고, 다음 집계의
+        // INSERT_MISSING 이 (0, 0) 행을 다시 만든다 (specs/2026-09-23-ledger-stock-design.md 6절 컴포넌트 표, D-L2).
+        // 행을 (0, 0) 으로 UPDATE 하면 그 행 락을 기다리던 동시 집계가 재검사로 새 행(0, 0)을 받은 채 리셋 전
+        // 스냅샷의 원장(방금 지운 행)을 다시 더한다. 행을 지우면 대기하던 집계는 재검사에서 행이 사라져 건너뛴다.
+        jdbcTemplate.update("delete from stock_balance");
         jdbcTemplate.update("delete from demo_order_queue");
         jdbcTemplate.update("delete from demo_served_tote");
     }

@@ -6,6 +6,7 @@ import com.awesome.backend.demo.repository.DemoOrderQueueRepository;
 import com.awesome.backend.demo.repository.DemoProductRepository;
 import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.ProductRepository;
+import com.awesome.backend.inventory.service.AvailableStockQuery;
 import com.awesome.backend.orders.repository.OrderRepository;
 import com.awesome.backend.outbound.entity.Tote;
 import com.awesome.backend.outbound.repository.BoxTypeRepository;
@@ -45,6 +46,7 @@ public class DemoResetService {
     private final DemoAutoFeeder autoFeeder;
     private final DemoOrderFeeder orderFeeder;
     private final DemoPrepacker prepacker;
+    private final AvailableStockQuery stockQuery;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DemoResetService(DemoDataLoader loader, DemoDataProperties properties,
@@ -54,7 +56,8 @@ public class DemoResetService {
                             ProductRepository productRepository, ToteRepository toteRepository,
                             BoxTypeRepository boxTypeRepository, OrderRepository orderRepository,
                             ShipmentRepository shipmentRepository, DemoAutoFeeder autoFeeder,
-                            DemoOrderFeeder orderFeeder, DemoPrepacker prepacker) {
+                            DemoOrderFeeder orderFeeder, DemoPrepacker prepacker,
+                            AvailableStockQuery stockQuery) {
         this.loader = loader;
         this.properties = properties;
         this.resetter = resetter;
@@ -69,6 +72,7 @@ public class DemoResetService {
         this.autoFeeder = autoFeeder;
         this.orderFeeder = orderFeeder;
         this.prepacker = prepacker;
+        this.stockQuery = stockQuery;
     }
 
     @Transactional
@@ -108,7 +112,7 @@ public class DemoResetService {
             for (DemoProduct demo : demoProductRepository.findByPool(pool)) {
                 productRepository.findByGtin(demo.gtin()).ifPresent(product ->
                         items.add(new DemoStatus.PoolProducts.Item(product.gtin(), product.name(),
-                                product.dimStatus(), product.stockQty())));
+                                product.dimStatus(), stockQuery.onHandQty(product.gtin()))));
             }
             items.sort((a, b) -> a.gtin().compareTo(b.gtin()));
             pools.add(new DemoStatus.PoolProducts(pool.name(), items));

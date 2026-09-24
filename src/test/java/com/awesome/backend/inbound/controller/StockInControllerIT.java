@@ -9,6 +9,7 @@ import com.awesome.backend.inbound.entity.Product;
 import com.awesome.backend.inbound.repository.ProductRepository;
 import com.awesome.backend.inventory.entity.InventoryTx;
 import com.awesome.backend.inventory.repository.InventoryTxRepository;
+import com.awesome.backend.support.StockTestSupport;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -30,6 +32,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest
 @Testcontainers
 @Transactional
+@Import(StockTestSupport.class)
 class StockInControllerIT {
 
     @Container
@@ -42,6 +45,7 @@ class StockInControllerIT {
     @Autowired WebApplicationContext context;
     @Autowired ProductRepository productRepository;
     @Autowired InventoryTxRepository inventoryTxRepository;
+    @Autowired StockTestSupport stock;
     @PersistenceContext EntityManager em;
 
     private MockMvc mvc;
@@ -63,7 +67,7 @@ class StockInControllerIT {
     @Test
     void 입고하면_재고가_늘고_반영된_수량을_돌려준다() throws Exception {
         Long productId = juiceId();
-        int before = productRepository.findById(productId).orElseThrow().stockQty();
+        int before = stock.onHandByProductId(productId);
 
         mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content(body(productId, 24)))
                 .andExpect(status().isOk())
@@ -72,14 +76,14 @@ class StockInControllerIT {
 
         em.flush();
         em.clear();
-        assertThat(productRepository.findById(productId).orElseThrow().stockQty())
+        assertThat(stock.onHandByProductId(productId))
                 .isEqualTo(before + 24);
     }
 
     @Test
     void 두_번_입고하면_누적된다() throws Exception {
         Long productId = juiceId();
-        int before = productRepository.findById(productId).orElseThrow().stockQty();
+        int before = stock.onHandByProductId(productId);
 
         mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content(body(productId, 10)))
                 .andExpect(status().isOk());

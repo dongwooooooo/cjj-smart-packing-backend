@@ -6,7 +6,7 @@ package com.awesome.backend.inventory.service;
  */
 public interface AvailableStockQuery {
 
-    /** 실재고. 장부(inventory_tx) 합계의 캐시인 product.stock_qty 기준. */
+    /** 실재고. 원장(inventory_tx) 스냅샷 + 미집계 차분 (D-L2). */
     int onHandQty(String gtin);
 
     /** 가용재고(ATP) = 실재고 − 포장 미완료 배송단위에 약속된 수량. */

@@ -21,20 +21,10 @@ public record ProductSummary(
         String dimStatus,
         int stockQty) {
 
-    public static ProductSummary from(Product product, Category category) {
-        return from(product, category, product.imageUrl());
-    }
-
-    /** 마스터 사진 주소를 따로 넘긴다 — 저장소 사진이 있으면 그쪽을 쓴다. */
-    public static ProductSummary from(Product product, Category category, String imageUrl) {
+    public static ProductSummary from(Product product, Category category, String imageUrl, int onHandQty) {
         return new ProductSummary(
-                product.id(),
-                product.gtin(),
-                product.name(),
-                category.getLargeName(),
-                category.getName(),
-                imageUrl,
-                product.dimStatus(),
-                product.stockQty());
+                product.id(), product.gtin(), product.name(),
+                category.getLargeName(), category.getName(),
+                imageUrl, product.dimStatus(), onHandQty);
     }
 }
