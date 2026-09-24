@@ -42,7 +42,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * 포장이 재고와 박스를 쓰기 시작하면 무엇이 리셋의 결과인지 가려진다.
  * 미리 포장하는 동작은 DemoPrepackIT 가 본다.
  */
-@SpringBootTest(properties = "demo.prepacked-shipments=0")
+@SpringBootTest(properties = {
+        "demo.prepacked-shipments=0",
+        // 첫 리셋 뒤 집계가 방금 쓴 원장을 바로 접어야 두 번째 리셋의 옛 스냅샷 회귀를 재현할 수 있다.
+        "inventory.collector.settle-seconds=0"})
 @Testcontainers
 @Transactional
 @Import(StockTestSupport.class)
@@ -303,9 +306,9 @@ class DemoResetIT {
 
     @Test
     void 리셋_뒤_실재고는_시연_명세_수량과_같고_스냅샷은_원장과_일치한다() throws Exception {
-        // 첫 리셋 직후에는 stock_balance 에 아직 행이 없다 — 실서비스에서는 이 행을
-        // StockBalanceCollector 가 리셋 뒤 몇 초 안에 원장을 읽어 만든다. 이 집계를
-        // 같은 트랜잭션 안에서 직접 불러 그 상태를 흉내낸다.
+        // 리셋 직후에는 stock_balance 에 행이 없다(리셋이 지운다) — 실서비스에서는 이 행을
+        // StockBalanceCollector 가 리셋 뒤 몇 초 안에 만든다. 테스트는 클래스 레벨 @Transactional 이라
+        // 집계를 테스트 트랜잭션 안에서 직접 불러 그 상태를 흉내낸다.
         mvc.perform(post(RESET)).andExpect(status().isOk());
         stockBalanceCollector.collectOnce();
 
@@ -314,7 +317,10 @@ class DemoResetIT {
         // 기준으로 delta 를 0으로 계산해 넘어가고, 스냅샷의 last_tx_id 는 방금 지워진
         // 원장 행을 가리킨 채 남는다.
         mvc.perform(post(RESET)).andExpect(status().isOk());
+        stockBalanceCollector.collectOnce();
 
+        assertThat(jdbcTemplate.queryForObject("select count(*) from stock_balance", Long.class))
+                .isEqualTo(jdbcTemplate.queryForObject("select count(*) from product", Long.class));
         Long mismatches = jdbcTemplate.queryForObject("""
                 select count(*) from stock_balance b
                  where b.qty + coalesce((select sum(t.qty_delta) from inventory_tx t
