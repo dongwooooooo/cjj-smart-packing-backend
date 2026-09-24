@@ -45,7 +45,7 @@ public class DemoStateResetter {
         jdbcTemplate.update("delete from measurement_image");
         jdbcTemplate.update("delete from measurement_session");
         jdbcTemplate.update("delete from inventory_tx");
-        // 원장을 비웠으므로 스냅샷도 0 — 실재고 = 스냅샷 + 미집계 원장 이 0 이 된다 (specs/2026-09-23-ledger-stock-design.md 8절).
+        // 원장을 비웠으므로 스냅샷도 0 — 실재고 = 스냅샷 + 미집계 원장 이 0 이 된다 (specs/2026-09-23-ledger-stock-design.md 6절 컴포넌트 표, D-L2).
         jdbcTemplate.update("update stock_balance set qty = 0, last_tx_id = 0, computed_at = now()");
         jdbcTemplate.update("delete from demo_order_queue");
         jdbcTemplate.update("delete from demo_served_tote");
