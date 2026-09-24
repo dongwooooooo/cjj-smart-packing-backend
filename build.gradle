@@ -47,6 +47,9 @@ tasks.named('test') {
     useJUnitPlatform {
         excludeTags 'benchmark'
     }
+    // 원장 집계·대조 스케줄러는 테스트에서 직접 호출한다 — 주기 실행이 컨테이너 종료 중 접속 실패 WARN 을 만들지 않게 사실상 끈다
+    systemProperty 'inventory.collector.interval-ms', '3600000'
+    systemProperty 'inventory.reconciler.interval-ms', '3600000'
 }
 
 // 편성 시간 측정 전용. ./gradlew benchmark
